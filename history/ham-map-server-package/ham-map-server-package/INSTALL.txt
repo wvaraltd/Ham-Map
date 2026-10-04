@@ -1,0 +1,29 @@
+HAM MAP — DEBIAN/APACHE INSTALLATION
+
+1. Upload this ZIP file to /home/hammap-deploy on the Debian server.
+
+2. On the server, run:
+
+   cd /home/hammap-deploy
+   unzip ham-map-server-package.zip -d ham-map-install
+   sudo rsync -a --delete ham-map-install/public/ /var/www/hammap/
+   sudo chown -R hammap-deploy:www-data /var/www/hammap
+   sudo find /var/www/hammap -type d -exec chmod 2775 {} \;
+   sudo find /var/www/hammap -type f -exec chmod 0664 {} \;
+
+3. Install the Apache site configuration:
+
+   sudo cp ham-map-install/apache-hammap.conf /etc/apache2/sites-available/hammap.conf
+   sudo a2dissite 000-default.conf
+   sudo a2ensite hammap.conf
+   sudo apache2ctl configtest
+   sudo systemctl reload apache2
+
+4. Open Ham Map from another device on the home network:
+
+   http://192.168.1.69
+
+The current package contains the Ham Map browser application. Live cloud logbook,
+authentication, POTA/SOTA feed ingestion and notification services will be added
+to the server backend in a later release.
+

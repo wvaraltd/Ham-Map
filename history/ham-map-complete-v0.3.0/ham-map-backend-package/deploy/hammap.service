@@ -1,0 +1,22 @@
+[Unit]
+Description=Ham Map API
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=hammap-deploy
+Group=www-data
+WorkingDirectory=/srv/hammap/current
+EnvironmentFile=/etc/hammap/hammap.env
+ExecStart=/usr/local/bin/node /srv/hammap/current/server.mjs
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/hammap /var/log/hammap
+
+[Install]
+WantedBy=multi-user.target
