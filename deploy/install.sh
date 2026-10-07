@@ -43,6 +43,16 @@ chown -R hammap-deploy:www-data "$RELEASE_DIR"
 
 sudo -u hammap-deploy /usr/local/bin/npm --prefix "$RELEASE_DIR" install --omit=dev --no-audit --no-fund
 
+# Ham Map connects over IPv4 loopback. Debian/PostgreSQL installations can
+# resolve localhost to IPv6 only, so explicitly keep PostgreSQL local-only
+# while accepting both IPv4 and IPv6 loopback connections.
+sudo -u postgres psql -v ON_ERROR_STOP=1 -c "ALTER SYSTEM SET listen_addresses = '127.0.0.1,::1'"
+systemctl restart postgresql
+if ! ss -H -lnt 'sport = :5432' | grep -q '127.0.0.1:5432'; then
+  echo "PostgreSQL is not listening on 127.0.0.1:5432 after configuration." >&2
+  exit 1
+fi
+
 if ! sudo -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='hammap'" | grep -q 1; then
   sudo -u postgres psql -v ON_ERROR_STOP=1 -c "CREATE ROLE hammap LOGIN PASSWORD '${DB_PASSWORD}'"
 elif [[ "$FIRST_INSTALL" -eq 1 ]]; then
@@ -94,7 +104,11 @@ systemctl reload apache2
 
 echo
 echo "Ham Map backend installed."
-echo "Local URL: http://192.168.1.69"
-echo "Health check: http://192.168.1.69/api/health"
+SERVER_IP="$(ip -4 -o route get 1.1.1.1 2>/dev/null | sed -n 's/.* src \\([^ ]*\\).*/\\1/p' | head -1)"
+if [[ -z "$SERVER_IP" ]]; then
+  SERVER_IP="$(hostname -I | cut -d' ' -f1)"
+fi
+echo "Local URL: http://${SERVER_IP:-127.0.0.1}"
+echo "Health check: http://${SERVER_IP:-127.0.0.1}/api/health"
 echo "WSJT-X ingestion token is stored in /etc/hammap/hammap.env"
 echo "Complete first-run operator setup from the Account button in Ham Map."
