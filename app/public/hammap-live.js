@@ -3,7 +3,7 @@
   const layerButton = name => document.querySelector(`[data-layer="${name}"]`);
   const enabled = name => layerButton(name)?.classList.contains('on');
   const safe = value => String(value ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
-  const station = { lat: Number($('latitude')?.value) || 37.77687, lon: Number($('longitude')?.value) || -81.202516 };
+  const station = { lat: Number($('latitude')?.value) || 0, lon: Number($('longitude')?.value) || 0 };
   let selectedBand = '20m';
   let measureArmed = false;
   let pathLine = null;
