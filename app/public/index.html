@@ -54,8 +54,6 @@
       <div class="group"><div class="group-head">△ Situation <span class="count">3 ON</span></div>
         <div class="toggle-row">NWS warnings<button class="toggle on" data-layer="weather" aria-label="Toggle weather"></button></div>
         <div class="toggle-row">Amateur satellites<button class="toggle on" data-layer="satellite" aria-label="Toggle satellites"></button></div>
-        <div class="toggle-row">AllStarLink nodes<button class="toggle on" data-layer="allstar" aria-label="Toggle AllStarLink"></button></div>
-        <div class="toggle-row">MeshCore local nodes<button class="toggle on" data-layer="meshcore" aria-label="Toggle MeshCore nodes"></button></div>
       </div>
     </aside>
     <section class="map" id="map">
@@ -79,8 +77,6 @@
       <div class="card" id="solarCard"><div class="card-head"><h3>Solar Conditions</h3><span class="status">LOADING</span></div><div class="solar-grid"><div class="metric"><label>Solar Flux</label><strong id="solarFlux">—</strong></div><div class="metric"><label>Kp Index</label><strong id="kpIndex">—</strong></div><div class="metric"><label>Sunspots</label><strong id="sunspots">—</strong></div><div class="metric"><label>Bz</label><strong id="bzValue">—</strong></div></div></div>
       <div class="card" id="dxCard"><div class="card-head"><h3>Latest DX</h3><span class="status">NOT CONFIGURED</span></div><p class="meta">Add a DX-cluster provider before this panel reports spots.</p></div>
       <div class="card" id="issCard"><div class="card-head"><h3>ISS Next Pass</h3><span class="status">NOT CONFIGURED</span></div><p class="meta">Pass prediction requires a current orbital-element feed.</p></div>
-      <div class="card" id="allstarCard"><div class="card-head"><h3>AllStarLink</h3><span class="status">NOT CONFIGURED</span></div><div class="node"><div class="node-ring" id="allstarNodeRing">—</div><div><strong id="allstarTitle">AllStar node</strong><p id="allstarDetail">Choose a provider and node in Settings.</p></div></div></div>
-      <div class="card" id="meshCard"><div class="card-head"><h3>MeshCore Local</h3><span class="status">NOT CONFIGURED</span></div><p class="meta">Configure a server-side local bridge before nodes are displayed.</p></div>
       <div class="card portable-card" id="portableSpotsCard"><div class="card-head"><h3>POTA / SOTA Spots</h3><span class="status">LOADING</span></div><div id="portableSpotList"><p class="meta">Loading activator feeds…</p></div></div>
       <div class="card warning-card" id="nwsCard"><div class="card-head"><h3>NWS Weather</h3><span class="status" style="background:#60351c;color:#ffd19c">1 ALERT</span></div><div class="warning-title">Severe Thunderstorm Watch</div><p>Selected area: Southern West Virginia<br>Valid until 10:00 PM EDT</p></div>
     </aside>
