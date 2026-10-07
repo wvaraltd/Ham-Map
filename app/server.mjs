@@ -166,7 +166,7 @@ async function handler(req, res) {
       if (await operatorCount()) return json(res, 409, { error: 'Operator account already exists' });
       const data = await body(req), callsign = cleanCall(data.callsign), password = String(data.password || '');
       if (!validCall(callsign)) return json(res, 400, { error: 'Enter a valid amateur-radio callsign' });
-      if (password.length < 12) return json(res, 400, { error: 'Password must contain at least 12 characters' });
+      if (password.length < 4) return json(res, 400, { error: 'Password must contain at least 4 characters' });
       const salt = crypto.randomBytes(24).toString('hex');
       const { rows } = await pool.query('INSERT INTO operators(callsign,password_salt,password_hash) VALUES($1,$2,$3) RETURNING id,callsign', [callsign, salt, passwordHash(password, salt)]);
       await pool.query('INSERT INTO settings(operator_id,data) VALUES($1,$2)', [rows[0].id, JSON.stringify({ callsign })]);
