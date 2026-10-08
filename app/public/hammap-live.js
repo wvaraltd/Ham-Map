@@ -10,7 +10,37 @@
   let liveSuccesses = 0;
   let liveFailures = 0;
 
-  const auroraLayer = L.layerGroup();
+  const earthquakesLayer=L.layerGroup();
+  const radarLayer=L.layerGroup();
+  leafletLayers.earthquakes=earthquakesLayer;
+  leafletLayers.radar=radarLayer;
+  async function loadEarthquakes(){
+    try{
+      const data=await getJson('/api/live/earthquakes');
+      earthquakesLayer.clearLayers();
+      let count=0;
+      for(const quake of data.features||[]){
+        const [lon,lat]=quake.geometry?.coordinates||[],mag=Number(quake.properties?.mag);
+        if(!Number.isFinite(lat)||!Number.isFinite(lon)||!Number.isFinite(mag))continue;
+        const color=mag>=6?'#ff4969':mag>=4.5?'#ffad52':'#f8d774';
+        const point=L.circleMarker([lat,lon],{radius:Math.max(3,Math.min(15,mag*1.8)),color,weight:1,fillColor:color,fillOpacity:.4});
+        const when=Number(quake.properties?.time);
+        point.bindPopup('<strong>M '+safe(mag.toFixed(1))+'</strong><br>'+safe(quake.properties?.place||'Unknown location')+'<br>'+safe(Number.isFinite(when)?new Date(when).toLocaleString():'Time unavailable')+'<br>Source: USGS');
+        earthquakesLayer.addLayer(point);count++;
+      }
+      rowStatus('earthquakes',count+' past 24h','ok');
+    }catch{rowStatus('earthquakes','feed offline','warn');}
+  }
+  async function loadRadar(){
+    try{
+      const data=await getJson('/api/live/radar');
+      radarLayer.clearLayers();
+      const url='https://tilecache.rainviewer.com'+data.path+'/256/{z}/{x}/{y}/2/1_1.png';
+      radarLayer.addLayer(L.tileLayer(url,{opacity:.62,maxNativeZoom:7,maxZoom:9,attribution:'Weather radar © <a href="https://www.rainviewer.com/" target="_blank" rel="noopener">RainViewer</a>'}));
+      rowStatus('radar',new Date(data.time*1000).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),'ok');
+    }catch{rowStatus('radar','feed offline','warn');}
+  }
+    const auroraLayer = L.layerGroup();
   leafletLayers.aurora = auroraLayer;
   const repeatersLayer = L.layerGroup();
   leafletLayers.repeaters = repeatersLayer;
@@ -93,7 +123,10 @@
   }
   drawGrid();
   layerButton('grid')?.addEventListener('click',()=>setTimeout(()=>{if(enabled('grid'))drawGrid();},0));
-  radioMap.on('moveend zoomend',()=>{if(enabled('grid'))drawGrid();});
+  layerButton('earthquakes')?.addEventListener('click',()=>setTimeout(()=>{if(enabled('earthquakes'))loadEarthquakes();},0));
+  layerButton('radar')?.addEventListener('click',()=>setTimeout(()=>{if(enabled('radar'))loadRadar();},0));
+  setInterval(()=>{if(enabled('earthquakes'))loadEarthquakes();if(enabled('radar'))loadRadar();},5*60*1000);
+    radioMap.on('moveend zoomend',()=>{if(enabled('grid'))drawGrid();});
   async function loadBoundaries(kind) {
     const layer = kind === 'states' ? statesLayer : countiesLayer;
     if (kind === 'counties' && radioMap.getZoom() < 5) { rowStatus(kind,'zoom in','warn'); return; }
