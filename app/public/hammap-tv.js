@@ -17,6 +17,15 @@ const title=document.createElement('strong');title.textContent='WV8T HAMMAP';
 const time=document.createElement('span');time.className='tv-time';
 const state=document.createElement('span');state.textContent='MAP DISPLAY';
 overlay.append(title,time,state);document.body.append(overlay);
+const controls=document.createElement('div');controls.className='tv-help';
+const fullscreen=document.createElement('button');fullscreen.type='button';fullscreen.textContent='⛶ Fullscreen';fullscreen.title='Enter or exit fullscreen (F)';
+const home=document.createElement('button');home.type='button';home.textContent='⌖ World';home.title='Fit world map';
+fullscreen.addEventListener('click',()=>{if(!document.fullscreenElement)document.documentElement.requestFullscreen?.().catch(()=>{});else document.exitFullscreen?.();});
+home.addEventListener('click',()=>radioMap.setView([20,0],Math.max(2,radioMap.getMinZoom()),{animate:false}));
+controls.append(fullscreen,home);document.body.append(controls);
+setTimeout(()=>controls.classList.add('auto-hide'),12000);
+document.addEventListener('fullscreenchange',()=>{fullscreen.textContent=document.fullscreenElement?'⛶ Exit fullscreen':'⛶ Fullscreen';setTimeout(()=>radioMap.invalidateSize(),100);});
+
 setInterval(()=>{time.textContent=new Date().toLocaleTimeString('en-GB',{timeZone:'UTC',hour12:false})+' UTC';},1000);
 const sync=message=>{
 if(!message||!Array.isArray(message.layers)||!Array.isArray(message.center))return;
@@ -40,6 +49,10 @@ channel?.addEventListener('message',event=>{if(event.data?.type==='state')sync(e
 window.addEventListener('storage',event=>{if(event.key==='hammap-tv-state')try{sync(JSON.parse(event.newValue));}catch{}});
 try{sync(JSON.parse(localStorage.getItem('hammap-tv-state')));}catch{}
 setTimeout(()=>radioMap.invalidateSize(),250);
+setTimeout(()=>radioMap.invalidateSize(),1200);
+const resizeObserver=typeof ResizeObserver!=='undefined'?new ResizeObserver(()=>radioMap.invalidateSize()):null;
+resizeObserver?.observe(document.getElementById('leafletMap'));
+
 window.addEventListener('resize',()=>radioMap.invalidateSize());
 window.addEventListener('keydown',event=>{if(event.key==='f'||event.key==='F'){if(!document.fullscreenElement)document.documentElement.requestFullscreen?.().catch(()=>{});else document.exitFullscreen?.();}});
 }else{
