@@ -180,4 +180,49 @@
 </script>
 <script src="hammap-client.js?v=0.3.1"></script>
 <script src="hammap-live.js?v=0.3.1"></script>
+<script>
+(() => {
+  const ids=['grid','latitude','longitude'];
+  const fields=Object.fromEntries(ids.map(id=>[id,document.getElementById(id)]));
+  const call=document.getElementById('callsign');
+  if(!call||ids.some(id=>!fields[id]))return;
+  let timer,sequence=0;
+  const changed=new Set();
+  ids.forEach(id=>fields[id].addEventListener('input',()=>changed.add(id)));
+  function gridCenter(grid) {
+    const g=String(grid||'').trim().toUpperCase();
+    if(!/^[A-R]{2}[0-9]{2}([A-X]{2})?$/.test(g))return null;
+    let lon=(g.charCodeAt(0)-65)*20-180+Number(g[2])*2;
+    let lat=(g.charCodeAt(1)-65)*10-90+Number(g[3]);
+    let dx=2,dy=1;
+    if(g.length===6){lon+=(g.charCodeAt(4)-65)/12;lat+=(g.charCodeAt(5)-65)/24;dx=1/12;dy=1/24;}
+    return {lat:lat+dy/2,lon:lon+dx/2};
+  }
+  function assign(id,value){
+    const el=fields[id];if(changed.has(id)||value==null||value==='')return;
+    el.value=String(value);el.dispatchEvent(new Event('change',{bubbles:true}));
+  }
+  async function lookup(){
+    const value=call.value.trim().toUpperCase(),token=++sequence;
+    if(!/^[A-Z0-9]{3,10}$/.test(value))return;
+    try {
+      const response=await fetch('/api/callsign/lookup?call='+encodeURIComponent(value));
+      if(!response.ok)return;
+      const data=await response.json();
+      if(token!==sequence||call.value.trim().toUpperCase()!==value||!data.found)return;
+      assign('grid',data.grid);
+      const center=gridCenter(data.grid);
+      const lat=Number(data.latitude),lon=Number(data.longitude);
+      assign('latitude',data.latitude!=null&&Number.isFinite(lat)&&Math.abs(lat)<=90?lat.toFixed(5):center?.lat.toFixed(5));
+      assign('longitude',data.longitude!=null&&Number.isFinite(lon)&&Math.abs(lon)<=180?lon.toFixed(5):center?.lon.toFixed(5));
+    }catch{}
+  }
+  call.addEventListener('input',()=>{clearTimeout(timer);sequence++;timer=setTimeout(lookup,650);});
+  call.addEventListener('blur',()=>{clearTimeout(timer);lookup();});
+  fields.grid.addEventListener('change',()=>{
+    const center=gridCenter(fields.grid.value);if(!center)return;
+    assign('latitude',center.lat.toFixed(5));assign('longitude',center.lon.toFixed(5));
+  });
+})();
+</script>
 </body></html>
