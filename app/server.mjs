@@ -85,8 +85,11 @@ async function remoteJson(url, ttlMs = 120000) {
 }
 function latestNumeric(rows, valueColumn) {
   if (!Array.isArray(rows) || rows.length < 2) return null;
-  const headers = rows[0], index = headers.indexOf(valueColumn);
-  return index < 0 ? null : Number(rows.at(-1)[index]);
+  const headers = rows[0];
+  if (!Array.isArray(headers)) { const value=rows.at(-1)?.[valueColumn] ?? rows.at(-1)?.[valueColumn.toLowerCase()]; const n=Number(value); return Number.isFinite(n)?n:null; }
+  const index = headers.indexOf(valueColumn);
+  if(index < 0)return null;
+  const n=Number(rows.at(-1)?.[index]);return Number.isFinite(n)?n:null;
 }
 async function feedSources() {
   const { rows }=await pool.query('SELECT data FROM settings ORDER BY operator_id LIMIT 1');
