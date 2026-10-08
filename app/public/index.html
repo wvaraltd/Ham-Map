@@ -64,7 +64,10 @@ body.tv-mode .app{display:block;height:100vh}body.tv-mode .top,body.tv-mode .lef
       <div class="group"><div class="group-head">⌁ DX & Radio <span class="count">2 ON</span></div>
         <div class="toggle-row">US state boundaries<button class="toggle on" data-layer="states" aria-label="Toggle state boundaries"></button></div>
         <div class="toggle-row">US county boundaries<button class="toggle" data-layer="counties" aria-label="Toggle county boundaries"></button></div>
-        <div class="toggle-row">Digital mode <select id="digitalModeFilter" aria-label="Digital mode" style="max-width:115px;background:#102330;color:#e8f4f2;border:1px solid #315063;border-radius:6px"><option value="ALL">All</option><option value="FT8">FT8</option><option value="FT4">FT4</option><option value="WSPR">WSPR</option></select></div><div class="toggle-row">Live DX spots<button class="toggle on" data-layer="dx" aria-label="Toggle DX"></button></div>
+        <div class="toggle-row">Digital activity — All modes<button class="toggle on digital-filter" data-digital-mode="ALL" aria-label="Show all digital modes"></button></div>
+        <div class="toggle-row">FT8 receptions<button class="toggle digital-filter" data-digital-mode="FT8" aria-label="Show FT8 receptions"></button></div>
+        <div class="toggle-row">FT4 receptions<button class="toggle digital-filter" data-digital-mode="FT4" aria-label="Show FT4 receptions"></button></div>
+        <div class="toggle-row">WSPR receptions<button class="toggle digital-filter" data-digital-mode="WSPR" aria-label="Show WSPR receptions"></button></div><div class="toggle-row">Live DX spots<button class="toggle on" data-layer="dx" aria-label="Toggle DX"></button></div>
         <div class="toggle-row">Callsign labels<button class="toggle on" data-layer="labels" aria-label="Toggle labels"></button></div>
         <div class="toggle-row">CQ / ITU zones<button class="toggle" data-layer="zones" aria-label="Toggle zones"></button></div>
         <div class="toggle-row">Maidenhead grid<button class="toggle" data-layer="grid" aria-label="Toggle grid"></button></div>
@@ -209,7 +212,7 @@ body.tv-mode .app{display:block;height:100vh}body.tv-mode .top,body.tv-mode .lef
   if(document.modelContext?.registerTool){document.modelContext.registerTool({name:'configure_station',title:'Configure Ham Map station',description:'Update the visible station callsign, Maidenhead grid, location, and weather state.',inputSchema:{type:'object',properties:{callsign:{type:'string'},grid:{type:'string'},location:{type:'string'},weatherArea:{type:'string',enum:['WV','VA','NC','SC','TN']}},required:['callsign','grid','location'],additionalProperties:false},annotations:{readOnlyHint:false,untrustedContentHint:false},execute:async i=>{if(!/^[A-Z0-9/]{3,12}$/i.test(i.callsign)||!/[A-R]{2}[0-9]{2}/i.test(i.grid))throw new Error('Invalid callsign or Maidenhead grid');callsign.value=i.callsign;grid.value=i.grid;location.value=i.location;if(i.weatherArea)weatherArea.value=i.weatherArea;saveLocal();applyStation();await loadNws();return{saved:true,callsign:callsign.value,grid:grid.value,location:location.value}}})}
 </script>
 <script src="hammap-client.js?v=0.3.1"></script>
-<script src="https://cdn.jsdelivr.net/npm/satellite.js@6.0.1/dist/satellite.min.js"></script><script src="hammap-live.js?v=0.3.7"></script><script src="hammap-tv.js?v=3"></script>
+<script src="https://cdn.jsdelivr.net/npm/satellite.js@6.0.1/dist/satellite.min.js"></script><script src="hammap-live.js?v=0.3.8"></script><script src="hammap-tv.js?v=3"></script>
 <script>
 (() => {
   const ids=['grid','latitude','longitude'];
