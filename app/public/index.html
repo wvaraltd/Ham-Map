@@ -70,6 +70,7 @@ body.tv-mode .app{display:block;height:100vh}body.tv-mode .top,body.tv-mode .lef
   body:not(.tv-mode) .pillbtn,body:not(.tv-mode) .iconbtn{flex-shrink:0;}
 }
 
+ #tabletInfoBtn{display:none}
 /* Touch tablet navigation: horizontal header swipe and independently accessible panels. */
 @media (min-width:721px) and (max-width:1366px){
  body:not(.tv-mode) .top{overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:thin;justify-content:flex-start;touch-action:pan-x;}
@@ -94,7 +95,7 @@ body.tv-mode .app{display:block;height:100vh}body.tv-mode .top,body.tv-mode .lef
     <button class="pillbtn mobile-only" id="mobileViewBtn" aria-label="Change mobile view">▦ <span>Map</span></button>
     <button class="pillbtn" id="tvBtn" title="Open map-only display in a new window">▣ <span>TV Map</span></button>
     <button class="pillbtn" id="tvCopyBtn" title="Copy direct map-only display link" aria-label="Copy TV map link">🔗</button>
-    <button class="pillbtn" id="tabletInfoBtn" style="display:none" aria-label="Open information panel" aria-expanded="false">☷ <span>Info</span></button>
+    <button class="pillbtn" id="tabletInfoBtn" aria-label="Open information panel" aria-expanded="false">☷ <span>Info</span></button>
     <button class="pillbtn" id="settingsBtn">⚙ <span>Settings</span></button>
   </header>
   <main class="workspace">
