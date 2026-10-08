@@ -230,9 +230,107 @@
     try{const response=await fetch('/api/feeds/test',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({feedSources:currentFeedSources()})});const data=await response.json();if(!response.ok)throw new Error(data.error||'Test failed');const failed=Object.entries(data.results).filter(([,result])=>!result.ok);toast(failed.length?`${failed.map(([name])=>name.toUpperCase()).join(', ')} failed; check URLs`:'Configured sources passed');}
     catch(error){toast(error.message);}finally{button.disabled=false;button.textContent='Test configured sources';}
   }
+  const satelliteColors={ISS:'#b7a4ff','SO-50':'#59e1ce','RS-44':'#ffbf76'};
+  let satelliteCatalog=[];
+  function satellitePrefs(){
+    return {ids:[...document.querySelectorAll('[data-satellite-id]:checked')].map(x=>x.dataset.satelliteId),
+      footprints:$('satelliteFootprints')?.checked!==false,tracks:$('satelliteTracks')?.checked!==false,passes:$('satellitePasses')?.checked!==false};
+  }
+  function restoreSatellitePrefs(){
+    try{
+      const p=JSON.parse(localStorage.getItem('hammap-satellites')||'null');
+      if(!p)return;
+      document.querySelectorAll('[data-satellite-id]').forEach(x=>x.checked=p.ids?.includes(x.dataset.satelliteId)??true);
+      for(const [id,key] of [['satelliteFootprints','footprints'],['satelliteTracks','tracks'],['satellitePasses','passes']])if(typeof p[key]==='boolean')$(id).checked=p[key];
+    }catch{}
+  }
+  function satellitePoint(record,date){
+    const pv=window.satellite.propagate(record,date);
+    if(!pv.position||!Number.isFinite(pv.position.x))return null;
+    const gmst=window.satellite.gstime(date);
+    const geo=window.satellite.eciToGeodetic(pv.position,gmst);
+    return {lat:window.satellite.degreesLat(geo.latitude),lon:window.satellite.degreesLong(geo.longitude),height:geo.height,eci:pv.position,gmst};
+  }
+  function satelliteElevation(point){
+    const observer={latitude:station.lat*Math.PI/180,longitude:station.lon*Math.PI/180,height:0};
+    const ecef=window.satellite.eciToEcf(point.eci,point.gmst);
+    return window.satellite.ecfToLookAngles(observer,ecef).elevation*180/Math.PI;
+  }
+  function satelliteNextPass(record){
+    const start=Date.now(),step=60000,limit=24*60;
+    let rise=null,max=-90,peak=null;
+    for(let i=0;i<=limit;i++){
+      const when=new Date(start+i*step),point=satellitePoint(record,when);
+      if(!point)continue;
+      const el=satelliteElevation(point);
+      if(el>0){if(!rise)rise=when;if(el>max){max=el;peak=when;}}
+      else if(rise)return {rise,peak,set:when,max};
+    }
+    return null;
+  }
+  function footprintPolygon(point){
+    const R=6371,alt=Math.max(0,point.height),radius=Math.acos(R/(R+alt));
+    const lat=point.lat*Math.PI/180,lon=point.lon*Math.PI/180,coords=[];
+    for(let i=0;i<=96;i++){
+      const bearing=i/96*2*Math.PI;
+      const phi=Math.asin(Math.sin(lat)*Math.cos(radius)+Math.cos(lat)*Math.sin(radius)*Math.cos(bearing));
+      const lambda=lon+Math.atan2(Math.sin(bearing)*Math.sin(radius)*Math.cos(lat),Math.cos(radius)-Math.sin(lat)*Math.sin(phi));
+      coords.push([phi*180/Math.PI,((lambda*180/Math.PI+540)%360)-180]);
+    }
+    return coords;
+  }
+  function renderSatellites(){
+    if(!window.satellite)return rowStatus('satellite','orbit library offline','warn');
+    satelliteLayer.clearLayers();
+    const prefs=satellitePrefs(),now=new Date(),results=[];
+    for(const item of satelliteCatalog){
+      if(!prefs.ids.includes(item.name))continue;
+      try{
+        const record=window.satellite.json2satrec(item.elements),point=satellitePoint(record,now);
+        if(!point)continue;
+        const color=satelliteColors[item.name]||'#a78bfa';
+        satelliteLayer.addLayer(L.circleMarker([point.lat,point.lon],{radius:7,color:'#fff',weight:1.5,fillColor:color,fillOpacity:1}).bindTooltip(item.name+' • '+Math.round(point.height)+' km',{permanent:true,className:'ham-tip'}));
+        if(prefs.footprints){
+          // Split at antimeridian to avoid long polygons across the world.
+          const poly=footprintPolygon(point),segments=[[]];
+          for(const coord of poly){const last=segments.at(-1);if(last.length&&Math.abs(coord[1]-last.at(-1)[1])>180)segments.push([]);segments.at(-1).push(coord);}
+          for(const segment of segments)if(segment.length>2)satelliteLayer.addLayer(L.polyline(segment,{color,weight:1,opacity:.45,dashArray:'4 5',interactive:false}));
+        }
+        if(prefs.tracks){
+          let segment=[],previous=null;
+          for(let offset=-45;offset<=90;offset+=3){
+            const p=satellitePoint(record,new Date(now.getTime()+offset*60000));if(!p)continue;
+            if(previous&&Math.abs(p.lon-previous.lon)>180){if(segment.length>1)satelliteLayer.addLayer(L.polyline(segment,{color,weight:1.5,opacity:.7,interactive:false}));segment=[];}
+            segment.push([p.lat,p.lon]);previous=p;
+          }
+          if(segment.length>1)satelliteLayer.addLayer(L.polyline(segment,{color,weight:1.5,opacity:.7,interactive:false}));
+        }
+        if(prefs.passes){
+          const pass=satelliteNextPass(record);
+          results.push(pass?item.name+': '+pass.rise.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})+'–'+pass.set.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})+' (max '+Math.round(pass.max)+'°) UTC/local per browser':item.name+': no pass predicted in 24 h');
+        }
+      }catch(e){results.push(item.name+': orbit unavailable');}
+    }
+    if($('satellitePassResults'))$('satellitePassResults').textContent=prefs.passes?(results.join(' | ')||'No satellites selected'):'Pass predictions disabled';
+    rowStatus('satellite',prefs.ids.length+' selected','ok');
+  }
+  async function loadSatellites(){
+    if(!satellitePrefs().ids.length){satelliteCatalog=[];satelliteLayer.clearLayers();rowStatus('satellite','none selected');return;}
+    try{
+      const data=await getJson('/api/live/satellites?ids='+encodeURIComponent(satellitePrefs().ids.join(',')));
+      satelliteCatalog=data.satellites||[];
+      renderSatellites();
+    }catch{rowStatus('satellite','orbit feed offline','warn');}
+  }
+  restoreSatellitePrefs();
+  document.querySelectorAll('[data-satellite-id],#satelliteFootprints,#satelliteTracks,#satellitePasses').forEach(x=>x.addEventListener('change',()=>{
+    localStorage.setItem('hammap-satellites',JSON.stringify(satellitePrefs()));loadSatellites();
+  }));
+  setInterval(()=>{if(enabled('satellite'))renderSatellites();},60000);
+  setInterval(loadSatellites,3600000);
   async function loadConfiguredFeeds(){
     if($('dxProvider')?.value==='custom')try{const data=await getJson('/api/live/dx'),spots=Array.isArray(data)?data:(data.spots||[]);dxLayer.clearLayers();for(const raw of spots){const spot=normalizeSpot(raw,'dx');if(spot&&(!selectedBand||!spot.band||spot.band===selectedBand))dxLayer.addLayer(L.marker([spot.lat,spot.lon],{icon:icon('dx-dot')}).bindTooltip(`${safe(spot.call)} • ${safe(spot.freq)} ${safe(spot.mode)}`,{className:'ham-tip'}));}rowStatus('dx',`${dxLayer.getLayers().length} spots`,'ok');}catch{dxLayer.clearLayers();rowStatus('dx','offline','warn');}
-    if($('issProvider')?.value!=='disabled')try{const data=await getJson('/api/live/iss');const lat=Number(data.latitude??data.lat),lon=Number(data.longitude??data.lon??data.lng);satelliteLayer.clearLayers();if(!Number.isFinite(lat)||!Number.isFinite(lon)||Math.abs(lat)>90||Math.abs(lon)>180)throw new Error('Invalid ISS position');satelliteLayer.addLayer(L.marker([lat,lon],{icon:icon('iss-dot')}).bindTooltip('ISS live position',{permanent:true,className:'ham-tip'}).bindPopup('ISS live position • '+lat.toFixed(3)+'°, '+lon.toFixed(3)+'°'));$('issCard').querySelector('.status').textContent='LIVE';rowStatus('satellite','ISS live','ok');}catch{$('issCard').querySelector('.status').textContent='OFFLINE';rowStatus('satellite','offline','warn');}
+    // Multi-satellite tracking is driven by selected CelesTrak orbital elements.
     if($('allstarProvider')?.value && $('allstarProvider').value!=='disabled')try{const data=await getJson('/api/live/allstar'),node=String(data.node||$('allstarNode').value);$('allstarNodeRing').textContent=node;$('allstarTitle').textContent=`AllStar node ${node}`;$('allstarCard').querySelector('.status').textContent=data.online?'ONLINE':'OFFLINE';$('allstarDetail').textContent=`Node ${node} • ${data.source||'configured source'}`;rowStatus('allstar',data.online?'online':'offline',data.online?'ok':'warn');}catch(error){const node=String($('allstarNode').value||'—');$('allstarNodeRing').textContent=node;$('allstarTitle').textContent=`AllStar node ${node}`;$('allstarCard').querySelector('.status').textContent='OFFLINE';$('allstarDetail').textContent='The configured AllStar source could not be reached.';rowStatus('allstar','offline','warn');}
     if($('meshProvider')?.value && $('meshProvider').value!=='disabled')try{const data=await getJson('/api/live/mesh'),nodes=Array.isArray(data)?data:(data.nodes||[]);meshcoreLayer.clearLayers();for(const node of nodes){const lat=Number(node.latitude??node.lat),lon=Number(node.longitude??node.lon??node.lng);if(Number.isFinite(lat)&&Number.isFinite(lon))meshcoreLayer.addLayer(L.marker([lat,lon],{icon:icon('mesh-dot')}).bindTooltip(safe(node.name||node.id||'Mesh node'),{className:'ham-tip'}));}rowStatus('meshcore',`${meshcoreLayer.getLayers().length} nodes`,'ok');}catch{meshcoreLayer.clearLayers();rowStatus('meshcore','offline','warn');}
   }
@@ -412,6 +510,6 @@
   $('callsign')?.addEventListener('change',loadPsk);
   layerButton('dx')?.addEventListener('click',()=>setTimeout(renderPsk,0));
   rowStatus('paths','use path tool');rowStatus('grid','20° × 10°');updateCounters();
-  loadBoundaries('states'); loadPortable(); loadWeather(); loadSolar();loadConfiguredFeeds();
+  loadBoundaries('states'); loadPortable(); loadWeather(); loadSolar();loadConfiguredFeeds();loadSatellites();
   setInterval(()=>{loadPortable();loadWeather();loadSolar();loadConfiguredFeeds();loadPsk()},5*60*1000);
 })();
