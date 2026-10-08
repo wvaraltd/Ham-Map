@@ -182,7 +182,7 @@
   async function loadPortable() {
     const all=[];
     for (const [kind,layer] of [['pota',potaLayer],['sota',sotaLayer]]) {
-      try { const data = await getJson(`/api/live/${kind}`); const spots=renderPortable(layer, data.spots || data, kind);all.push(...spots);rowStatus(kind,`${spots.length} spots`,'ok');setFeedState(true, `${kind.toUpperCase()} updated`); }
+      try { const data = await getJson(`/api/live/${kind}`); if(data.disabled){layer.clearLayers();rowStatus(kind,'not configured');continue;} const spots=renderPortable(layer, data.spots || data, kind);all.push(...spots);rowStatus(kind,`${spots.length} spots`,'ok');setFeedState(true, `${kind.toUpperCase()} updated`); }
       catch { layer.clearLayers();setLayer(kind,false);rowStatus(kind,'feed offline','warn');setFeedState(false, `${kind.toUpperCase()} unavailable`); }
     }
     const card=$('portableSpotsCard'), list=$('portableSpotList');
