@@ -32,6 +32,7 @@ body.tv-mode .tv-help.auto-hide{opacity:0;transition:opacity .5s}
 body.tv-mode .tv-help.auto-hide:hover,body.tv-mode .tv-help.auto-hide:focus-within{opacity:1}
 @media(max-width:700px){body.tv-mode .tv-overlay{gap:7px;font-size:12px}.tv-overlay .tv-time{font-size:12px}}
 body.tv-mode .app{display:block;height:100vh}body.tv-mode .top,body.tv-mode .left,body.tv-mode .right,body.tv-mode .bands,body.tv-mode .quick-log,body.tv-mode .map-tools,body.tv-mode .legend,body.tv-mode .station-card{display:none!important}body.tv-mode .workspace{display:block;height:100vh}body.tv-mode .map{width:100vw;height:100vh;position:relative}body.tv-mode #leafletMap{width:100%;height:100%}body.tv-mode .earth{display:none!important}body.tv-mode .leaflet-control-zoom{display:none}body.tv-mode{overflow:hidden}body.tv-mode .tv-overlay{display:flex}.tv-overlay{display:none;position:fixed;top:14px;left:18px;z-index:1000;align-items:center;gap:15px;background:#07131dcc;border:1px solid #285267;border-radius:9px;padding:8px 13px;color:#e7f7fa;font-size:13px;pointer-events:none}.tv-overlay strong{color:#6ee5c9}.tv-overlay .tv-time{font-variant-numeric:tabular-nums;color:#b9d7e1}
+@media(min-width:721px){body.layers-hidden .workspace{grid-template-columns:0 minmax(0,1fr) 300px}body.layers-hidden #layersPanel{display:none}body.layers-hidden .map{min-width:0}}
 </style>
 </head>
 <body>
@@ -175,7 +176,15 @@ body.tv-mode .app{display:block;height:100vh}body.tv-mode .top,body.tv-mode .lef
   document.getElementById('worldView').onclick=()=>radioMap.setView([20,0],2,{animate:true});
   document.querySelectorAll('.toggle').forEach(t=>t.onclick=()=>{t.classList.toggle('on');const layer=leafletLayers[t.dataset.layer];if(layer){const same=[...document.querySelectorAll('[data-layer]')].filter(x=>leafletLayers[x.dataset.layer]===layer);const wanted=same.some(x=>x.classList.contains('on'));if(wanted&&!radioMap.hasLayer(layer))layer.addTo(radioMap);if(!wanted&&radioMap.hasLayer(layer))radioMap.removeLayer(layer)}saveLocal()});
   const drawer=document.getElementById('drawer');document.getElementById('settingsBtn').onclick=()=>{drawer.classList.add('open');drawer.setAttribute('aria-hidden','false')};document.getElementById('closeDrawer').onclick=()=>{drawer.classList.remove('open');drawer.setAttribute('aria-hidden','true')};
-  document.getElementById('layersBtn').onclick=()=>document.getElementById('layersPanel').classList.toggle('mobile-open');
+  document.getElementById('layersBtn').onclick=()=>{
+    const panel=document.getElementById('layersPanel');
+    const open=panel.classList.toggle('mobile-open');
+    document.body.classList.toggle('layers-hidden',!open);
+    document.getElementById('layersBtn').setAttribute('aria-expanded',String(open));
+    setTimeout(()=>radioMap.invalidateSize(),150);
+  };
+  document.getElementById('layersBtn').setAttribute('aria-controls','layersPanel');
+  document.getElementById('layersBtn').setAttribute('aria-expanded','true');
   document.querySelectorAll('.preset').forEach(p=>p.onclick=()=>{document.querySelectorAll('.preset').forEach(x=>x.classList.remove('active'));p.classList.add('active');toast(`${p.textContent} loaded`)});
   function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),1800)}
   function tick(){const d=new Date();document.getElementById('utc').textContent=d.toISOString().slice(11,19)+' UTC';document.getElementById('local').textContent=d.toLocaleString([], {weekday:'short',hour:'numeric',minute:'2-digit',timeZoneName:'short'})}tick();setInterval(tick,1000);
