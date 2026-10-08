@@ -22,6 +22,7 @@ body.tv-mode .leaflet-tooltip.ham-tip{font-size:clamp(13px,1.05vw,26px);line-hei
 body.tv-mode .leaflet-tooltip.ham-tip:before{display:none}
 body.tv-mode .leaflet-control-attribution{font-size:clamp(10px,.65vw,16px)!important;padding:3px 8px!important}
 body.tv-mode .tv-overlay{top:auto;left:auto;bottom:clamp(28px,2.2vw,60px);right:clamp(18px,1.4vw,42px);padding:clamp(9px,.7vw,18px) clamp(14px,1vw,28px);gap:clamp(12px,1vw,28px);font-size:clamp(14px,1vw,26px);box-shadow:0 6px 30px #0008;max-width:calc(100vw - 48px)}
+body.tv-mode .tv-overlay{flex-wrap:wrap;justify-content:flex-end;max-width:min(92vw,1100px)}
 body.tv-mode .tv-overlay strong{font-size:1.1em;letter-spacing:.09em}
 body.tv-mode .tv-overlay .tv-time{font-size:1.05em}
 body.tv-mode .tv-help{position:fixed;right:clamp(14px,1vw,32px);top:clamp(14px,1vw,32px);z-index:1001;display:flex;gap:8px}
@@ -199,7 +200,7 @@ body.tv-mode .app{display:block;height:100vh}body.tv-mode .top,body.tv-mode .lef
   if(document.modelContext?.registerTool){document.modelContext.registerTool({name:'configure_station',title:'Configure Ham Map station',description:'Update the visible station callsign, Maidenhead grid, location, and weather state.',inputSchema:{type:'object',properties:{callsign:{type:'string'},grid:{type:'string'},location:{type:'string'},weatherArea:{type:'string',enum:['WV','VA','NC','SC','TN']}},required:['callsign','grid','location'],additionalProperties:false},annotations:{readOnlyHint:false,untrustedContentHint:false},execute:async i=>{if(!/^[A-Z0-9/]{3,12}$/i.test(i.callsign)||!/[A-R]{2}[0-9]{2}/i.test(i.grid))throw new Error('Invalid callsign or Maidenhead grid');callsign.value=i.callsign;grid.value=i.grid;location.value=i.location;if(i.weatherArea)weatherArea.value=i.weatherArea;saveLocal();applyStation();await loadNws();return{saved:true,callsign:callsign.value,grid:grid.value,location:location.value}}})}
 </script>
 <script src="hammap-client.js?v=0.3.1"></script>
-<script src="https://cdn.jsdelivr.net/npm/satellite.js@6.0.1/dist/satellite.min.js"></script><script src="hammap-live.js?v=0.3.6"></script><script src="hammap-tv.js?v=2"></script>
+<script src="https://cdn.jsdelivr.net/npm/satellite.js@6.0.1/dist/satellite.min.js"></script><script src="hammap-live.js?v=0.3.6"></script><script src="hammap-tv.js?v=3"></script>
 <script>
 (() => {
   const ids=['grid','latitude','longitude'];
