@@ -26,6 +26,7 @@
       Object.assign(state, await api('/api/auth/session', { method: 'GET', headers: {} }));
       updateAccountUi();
       if (state.authenticated) await syncSettingsFromServer();
+      else await loadPublicStation();
     } catch (error) { $('accountStatus').textContent = 'Backend unavailable'; }
   }
   function updateAccountUi() {
@@ -53,7 +54,16 @@
       Object.assign(state, result, { setupRequired: false }); $('callsign').value = state.callsign; $('accountPassword').value = ''; updateAccountUi(); applyStation(); $('accountModal').classList.remove('open'); toast(`Signed in as ${state.callsign}`); await syncSettingsToServer(); await renderRemoteLog();
     } catch (error) { $('accountError').textContent = error.message; }
   }
-  async function logout() { await api('/api/auth/logout', { method: 'POST', body: '{}' }); Object.assign(state, { authenticated: false, callsign: null }); $('logModal').classList.remove('open'); $('logModal').setAttribute('aria-hidden','true'); updateAccountUi(); $('accountModal').classList.remove('open'); toast('Signed out'); }
+  async function loadPublicStation() {
+    try {
+      const d=await api('/api/public/station',{method:'GET',headers:{}});
+      if(!d.configured)return;
+      for(const [key,id] of Object.entries({callsign:'callsign',grid:'grid',location:'location',latitude:'latitude',longitude:'longitude'}))if(d[key]!==null&&d[key]!==undefined&&$(id))$(id).value=d[key];
+      window.dispatchEvent(new Event('hammap-settings-loaded'));
+      applyStation();
+    }catch(e){console.warn('Public station position unavailable');}
+  }
+  async function logout() { await api('/api/auth/logout', { method: 'POST', body: '{}' }); Object.assign(state, { authenticated: false, callsign: null }); $('logModal').classList.remove('open'); $('logModal').setAttribute('aria-hidden','true'); updateAccountUi(); $('accountModal').classList.remove('open'); await loadPublicStation(); toast('Signed out'); }
   function feedSources() { const value=id=>$(id)?.value||''; return {pota:{provider:value('potaProvider')},solar:{provider:value('solarProvider')},nws:{provider:value('nwsProvider')},boundaries:{provider:value('boundaryProvider')},sota:{provider:value('sotaProvider'),url:value('sotaUrl')},dx:{provider:value('dxProvider'),url:value('dxUrl')},iss:{provider:value('issProvider'),url:value('issUrl')},allstar:{provider:value('allstarProvider'),url:value('allstarUrl'),node:value('allstarNode')},mesh:{provider:value('meshProvider'),url:value('meshUrl')}}; }
   function stationSettings() { return { callsign: $('callsign').value.toUpperCase(), grid: $('grid').value.toUpperCase(), location: $('location').value, latitude: Number($('latitude').value), longitude: Number($('longitude').value), weatherArea: $('weatherArea').value, operationMode: $('operationMode').value, potaRef: $('potaRef').value.toUpperCase(), sotaRef: $('sotaRef').value.toUpperCase(), portableGrid: $('portableGrid').value.toUpperCase(), activationName: $('activationName').value, feedSources:feedSources() }; }
   async function syncSettingsToServer() { if (!state.authenticated) return; await api('/api/settings', { method: 'PUT', body: JSON.stringify(stationSettings()) }); }
