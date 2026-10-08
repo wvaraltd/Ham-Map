@@ -80,6 +80,17 @@ body.tv-mode .app{display:block;height:100vh}body.tv-mode .top,body.tv-mode .lef
  body:not(.tv-mode) .right.tablet-open{visibility:visible;transform:translateX(0)}
  body:not(.tv-mode) #tabletInfoBtn{display:flex}
 }
+
+/* iPad drawer reliability: fixed overlays bypass grid clipping and map stacking. */
+@media (min-width:721px) and (max-width:1366px){
+ body:not(.tv-mode) #layersPanel{position:fixed!important;top:58px!important;left:0!important;right:auto!important;bottom:58px!important;height:auto!important;width:min(330px,86vw)!important;max-width:86vw!important;z-index:2000!important;display:block!important;visibility:hidden!important;transform:translate3d(-110%,0,0)!important;overflow-y:auto!important;pointer-events:none;}
+ body:not(.tv-mode) #layersPanel.mobile-open{visibility:visible!important;transform:translate3d(0,0,0)!important;pointer-events:auto;}
+ body:not(.tv-mode) .workspace>.right{position:fixed!important;top:58px!important;right:0!important;left:auto!important;bottom:58px!important;height:auto!important;width:min(350px,88vw)!important;max-width:88vw!important;z-index:2001!important;display:block!important;visibility:hidden!important;transform:translate3d(110%,0,0)!important;overflow-y:auto!important;pointer-events:none;}
+ body:not(.tv-mode) .workspace>.right.tablet-open{visibility:visible!important;transform:translate3d(0,0,0)!important;pointer-events:auto;}
+}
+@media (max-width:720px){
+ body:not(.tv-mode) #layersPanel{position:fixed!important;top:58px!important;bottom:0!important;left:0!important;height:auto!important;z-index:2000!important;}
+}
 </style>
 </head>
 <body>
