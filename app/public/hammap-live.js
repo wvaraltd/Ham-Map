@@ -130,9 +130,53 @@
     } catch { $('solarCard').querySelector('.status').textContent = 'UNAVAILABLE'; setFeedState(false, 'space weather unavailable'); }
   }
   function currentFeedSources() { const value=id=>$(id)?.value||'';return {sota:{provider:value('sotaProvider'),url:value('sotaUrl')},dx:{provider:value('dxProvider'),url:value('dxUrl')},iss:{provider:value('issProvider'),url:value('issUrl')},allstar:{provider:value('allstarProvider'),url:value('allstarUrl'),node:value('allstarNode')},mesh:{provider:value('meshProvider'),url:value('meshUrl')}}; }
+  function pskGridPoint(grid){
+    const g=String(grid||'').toUpperCase();
+    if(!/^[A-R]{2}[0-9]{2}([A-X]{2})?/.test(g))return null;
+    let lon=(g.charCodeAt(0)-65)*20-180+Number(g[2])*2;
+    let lat=(g.charCodeAt(1)-65)*10-90+Number(g[3]);
+    let dx=2,dy=1;
+    if(g.length>=6){lon+=(g.charCodeAt(4)-65)/12;lat+=(g.charCodeAt(5)-65)/24;dx=1/12;dy=1/24;}
+    return [lat+dy/2,lon+dx/2];
+  }
+  function pskBand(hz){
+    const mhz=Number(hz)/1e6;
+    for(const [name,low,high] of [['160m',1.8,2],['80m',3.5,4],['60m',5.3,5.5],['40m',7,7.3],['30m',10.1,10.15],['20m',14,14.35],['17m',18.068,18.168],['15m',21,21.45],['12m',24.89,24.99],['10m',28,29.7],['6m',50,54],['2m',144,148],['70cm',420,450]])if(mhz>=low&&mhz<=high)return name;
+    return '';
+  }
+  let pskReports=[];
+  function renderPsk(){
+    if($('dxProvider')?.value==='custom')return;
+    dxLayer.clearLayers();
+    const filtered=pskReports.filter(r=>pskBand(r.frequency)===selectedBand);
+    for(const r of filtered.slice(0,500)){
+      const tx=pskGridPoint(r.senderLocator),rx=pskGridPoint(r.receiverLocator);
+      if(!tx||!rx)continue;
+      const label=safe(r.senderCallsign)+' → '+safe(r.receiverCallsign)+' · '+(Number(r.frequency)/1e6).toFixed(4)+' MHz · '+safe(r.mode);
+      dxLayer.addLayer(L.polyline([tx,rx],{color:'#5bd4ed',weight:1,opacity:.4,interactive:false}));
+      dxLayer.addLayer(L.circleMarker(tx,{radius:3,color:'#5bd4ed',fillOpacity:.7}).bindTooltip(label,{className:'ham-tip'}));
+    }
+    rowStatus('dx',filtered.length+' reports','ok');
+    document.querySelectorAll('.band').forEach(button=>{
+      const band=button.querySelector('strong')?.textContent?.trim();
+      if(!band)return;
+      const count=pskReports.filter(r=>pskBand(r.frequency)===band).length;
+      button.title=count+' PSK Reporter receptions in last 30 minutes for station callsign';
+    });
+  }
+  async function loadPsk(){
+    if($('dxProvider')?.value==='custom')return;
+    const call=$('callsign')?.value?.trim().toUpperCase();
+    if(!call){rowStatus('dx','enter callsign');return;}
+    try{
+      const data=await getJson('/api/live/psk?call='+encodeURIComponent(call));
+      pskReports=Array.isArray(data.reports)?data.reports:[];
+      renderPsk();
+    }catch{rowStatus('dx','feed offline','warn');}
+  }
   function updateSourceFields() {
     document.querySelectorAll('[data-source-url]').forEach(field=>{const name=field.dataset.sourceUrl,select=$(`${name}Provider`);field.hidden=select?.value!=='custom';});
-    for(const [sourceName,layerName] of [['sota','sota'],['dx','dx'],['iss','satellite'],['allstar','allstar'],['mesh','meshcore']]){const button=layerButton(layerName),configured=$(`${sourceName}Provider`)?.value!=='disabled';if(button){button.disabled=!configured;button.setAttribute('aria-disabled',String(!configured));if(!configured)setLayer(layerName,false);}const row=button?.closest('.toggle-row');if(row){row.style.opacity=configured?'1':'.55';rowStatus(layerName,configured?'ready':'not set',configured?'ok':'');}}
+    for(const [sourceName,layerName] of [['sota','sota'],['iss','satellite'],['allstar','allstar'],['mesh','meshcore']]){const button=layerButton(layerName),configured=$(`${sourceName}Provider`)?.value!=='disabled';if(button){button.disabled=!configured;button.setAttribute('aria-disabled',String(!configured));if(!configured)setLayer(layerName,false);}const row=button?.closest('.toggle-row');if(row){row.style.opacity=configured?'1':'.55';rowStatus(layerName,configured?'ready':'not set',configured?'ok':'');}}
     updateCounters();
   }
   async function testDataSources() {
@@ -141,7 +185,7 @@
     catch(error){toast(error.message);}finally{button.disabled=false;button.textContent='Test configured sources';}
   }
   async function loadConfiguredFeeds(){
-    if($('dxProvider')?.value!=='disabled')try{const data=await getJson('/api/live/dx'),spots=Array.isArray(data)?data:(data.spots||[]);dxLayer.clearLayers();for(const raw of spots){const spot=normalizeSpot(raw,'dx');if(spot&&(!selectedBand||!spot.band||spot.band===selectedBand))dxLayer.addLayer(L.marker([spot.lat,spot.lon],{icon:icon('dx-dot')}).bindTooltip(`${safe(spot.call)} • ${safe(spot.freq)} ${safe(spot.mode)}`,{className:'ham-tip'}));}rowStatus('dx',`${dxLayer.getLayers().length} spots`,'ok');}catch{dxLayer.clearLayers();rowStatus('dx','offline','warn');}
+    if($('dxProvider')?.value==='custom')try{const data=await getJson('/api/live/dx'),spots=Array.isArray(data)?data:(data.spots||[]);dxLayer.clearLayers();for(const raw of spots){const spot=normalizeSpot(raw,'dx');if(spot&&(!selectedBand||!spot.band||spot.band===selectedBand))dxLayer.addLayer(L.marker([spot.lat,spot.lon],{icon:icon('dx-dot')}).bindTooltip(`${safe(spot.call)} • ${safe(spot.freq)} ${safe(spot.mode)}`,{className:'ham-tip'}));}rowStatus('dx',`${dxLayer.getLayers().length} spots`,'ok');}catch{dxLayer.clearLayers();rowStatus('dx','offline','warn');}
     if($('issProvider')?.value!=='disabled')try{const data=await getJson('/api/live/iss');const lat=Number(data.latitude??data.lat),lon=Number(data.longitude??data.lon??data.lng);satelliteLayer.clearLayers();if(Number.isFinite(lat)&&Number.isFinite(lon))satelliteLayer.addLayer(L.marker([lat,lon],{icon:icon('iss-dot')}).bindTooltip('ISS live position',{permanent:true,className:'ham-tip'}));$('issCard').querySelector('.status').textContent='LIVE';rowStatus('satellite','live','ok');}catch{$('issCard').querySelector('.status').textContent='OFFLINE';rowStatus('satellite','offline','warn');}
     if($('allstarProvider')?.value && $('allstarProvider').value!=='disabled')try{const data=await getJson('/api/live/allstar'),node=String(data.node||$('allstarNode').value);$('allstarNodeRing').textContent=node;$('allstarTitle').textContent=`AllStar node ${node}`;$('allstarCard').querySelector('.status').textContent=data.online?'ONLINE':'OFFLINE';$('allstarDetail').textContent=`Node ${node} • ${data.source||'configured source'}`;rowStatus('allstar',data.online?'online':'offline',data.online?'ok':'warn');}catch(error){const node=String($('allstarNode').value||'—');$('allstarNodeRing').textContent=node;$('allstarTitle').textContent=`AllStar node ${node}`;$('allstarCard').querySelector('.status').textContent='OFFLINE';$('allstarDetail').textContent='The configured AllStar source could not be reached.';rowStatus('allstar','offline','warn');}
     if($('meshProvider')?.value && $('meshProvider').value!=='disabled')try{const data=await getJson('/api/live/mesh'),nodes=Array.isArray(data)?data:(data.nodes||[]);meshcoreLayer.clearLayers();for(const node of nodes){const lat=Number(node.latitude??node.lat),lon=Number(node.longitude??node.lon??node.lng);if(Number.isFinite(lat)&&Number.isFinite(lon))meshcoreLayer.addLayer(L.marker([lat,lon],{icon:icon('mesh-dot')}).bindTooltip(safe(node.name||node.id||'Mesh node'),{className:'ham-tip'}));}rowStatus('meshcore',`${meshcoreLayer.getLayers().length} nodes`,'ok');}catch{meshcoreLayer.clearLayers();rowStatus('meshcore','offline','warn');}
@@ -193,7 +237,7 @@
     saveLocal(); if(wanted.has('counties'))loadBoundaries('counties'); toast(`${p.textContent} loaded`);
   });
   document.querySelectorAll('.band').forEach(b=>b.onclick=()=>{
-    document.querySelectorAll('.band').forEach(x=>x.classList.remove('active')); b.classList.add('active'); selectedBand=b.querySelector('strong').textContent; $('bandContext').textContent=`${selectedBand} • live spots`; loadPortable();
+    document.querySelectorAll('.band').forEach(x=>x.classList.remove('active')); b.classList.add('active'); selectedBand=b.querySelector('strong').textContent; renderPsk(); $('bandContext').textContent=`${selectedBand} • live spots`; loadPortable();
   });
 
   function updateActivationState() {
@@ -253,9 +297,12 @@
   $('allstarNode')?.addEventListener('input',()=>{if($('allstarNode').value.replace(/\D/g,'')&&$('allstarProvider')?.value==='disabled')$('allstarProvider').value='official';updateSourceFields();});
   $('allstarProvider')?.addEventListener('change',()=>{updateSourceFields();});
   loadLocal();
-  for (const name of ['dlayer','aurora','zones','repeaters','labels']) layerButton(name)?.classList.remove('on');
+  for (const name of ['dlayer','aurora','zones','labels']) layerButton(name)?.classList.remove('on');
   updateSourceFields();
+  loadPsk();
+  $('callsign')?.addEventListener('change',loadPsk);
+  layerButton('dx')?.addEventListener('click',()=>setTimeout(renderPsk,0));
   rowStatus('paths','use path tool');rowStatus('grid','20° × 10°');updateCounters();
   loadBoundaries('states'); loadPortable(); loadWeather(); loadSolar();loadConfiguredFeeds();
-  setInterval(()=>{loadPortable();loadWeather();loadSolar();loadConfiguredFeeds()},5*60*1000);
+  setInterval(()=>{loadPortable();loadWeather();loadSolar();loadConfiguredFeeds();loadPsk()},5*60*1000);
 })();
