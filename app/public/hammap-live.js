@@ -10,6 +10,8 @@
   let liveSuccesses = 0;
   let liveFailures = 0;
 
+  const repeatersLayer = L.layerGroup();
+  leafletLayers.repeaters = repeatersLayer;
   const statesLayer = L.geoJSON(null, { style: { color:'#7bc8ff', weight:1.25, opacity:.9, fillOpacity:0 } });
   const countiesLayer = L.geoJSON(null, { style: { color:'#9ec2cf', weight:.7, opacity:.65, fillOpacity:0 } });
   const grayLayer = L.polyline(solarNightRing(), { color:'#ffe0a1', weight:10, opacity:.18, interactive:false });
@@ -206,10 +208,38 @@
   };
   $('endActivation').onclick=()=>{const a=JSON.parse(localStorage.getItem('hammap-activation')||'null');if(a){a.active=false;a.ended=new Date().toISOString();localStorage.setItem('hammap-activation',JSON.stringify(a));}updateActivationState();toast('Portable activation ended')};
 
-  for (const name of ['dlayer','aurora','zones','repeaters','labels']) {
+  for (const name of ['dlayer','aurora','zones','labels']) {
     const button=layerButton(name), row=button?.closest('.toggle-row');
     if(button){button.classList.remove('on');button.disabled=true;button.setAttribute('aria-disabled','true');}
     if(row){row.title='A live data source is not configured';row.style.opacity='.55';rowStatus(name,'not set');}
+  }
+  async function loadRepeaters() {
+    try {
+      const data=await getJson('/api/live/repeaters');
+      if(!Array.isArray(data.repeaters))throw new Error('Invalid repeater directory');
+      repeatersLayer.clearLayers();
+      let mapped=0;
+      for(const r of data.repeaters){
+        const lat=Number(r.latitude),lon=Number(r.longitude);
+        if(!Number.isFinite(lat)||!Number.isFinite(lon)||Math.abs(lat)>90||Math.abs(lon)>180||(Math.abs(lat)<0.01&&Math.abs(lon)<0.01))continue;
+        const status=String(r.status||'unknown').toLowerCase();
+        const color=({active:'#28caa2',maintenance:'#ffbb55',degraded:'#ffbb55',offline:'#ef7474',planned:'#9ba9bc'})[status]||'#9ba9bc';
+        const marker=L.circleMarker([lat,lon],{radius:6,color,weight:2,fillColor:color,fillOpacity:.8});
+        const title=safe(r.callsign||'Repeater')+' · '+safe(r.frequency??'?')+' MHz';
+        marker.bindPopup('<strong>'+title+'</strong><br>'+safe(r.location_name||r.nearest_city||'')+'<br>Input: '+safe(r.input_frequency??'—')+' MHz · Tone: '+safe(r.tone||'—')+'<br>'+safe(r.band||'')+' · '+safe(r.mode||'')+'<br>Status: '+safe(status)+'<br>'+safe(r.club_affiliate||'')+(r.needs_review?'<br>Coordinates need review':'')+'<br><a href="https://ara.radio/repeaters" target="_blank" rel="noopener noreferrer">ARA repeater directory</a>');
+        marker.bindTooltip(title,{className:'ham-tip'});
+        repeatersLayer.addLayer(marker);mapped++;
+      }
+      rowStatus('repeaters',mapped+' mapped'+(data.repeaters.length>mapped?' / '+data.repeaters.length:'') ,'ok');
+    }catch{rowStatus('repeaters','feed offline','warn');}
+  }
+  const repeaterButton=layerButton('repeaters');
+  if(repeaterButton){
+    repeaterButton.disabled=false;repeaterButton.removeAttribute('aria-disabled');
+    repeaterButton.closest('.toggle-row')?.style.removeProperty('opacity');
+    repeaterButton.addEventListener('click',()=>setTimeout(()=>{if(enabled('repeaters'))loadRepeaters();},0));
+    loadRepeaters();
+    setInterval(()=>{if(enabled('repeaters'))loadRepeaters();},300000);
   }
   radioMap.on('moveend zoomend',()=>{if(enabled('states'))loadBoundaries('states');if(enabled('counties'))loadBoundaries('counties')});
   layerButton('states').addEventListener('click',()=>setTimeout(()=>enabled('states')&&loadBoundaries('states'),0));
