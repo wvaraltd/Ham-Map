@@ -231,19 +231,37 @@
     try{const response=await fetch('/api/feeds/test',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({feedSources:currentFeedSources()})});const data=await response.json();if(!response.ok)throw new Error(data.error||'Test failed');const failed=Object.entries(data.results).filter(([,result])=>!result.ok);toast(failed.length?`${failed.map(([name])=>name.toUpperCase()).join(', ')} failed; check URLs`:'Configured sources passed');}
     catch(error){toast(error.message);}finally{button.disabled=false;button.textContent='Test configured sources';}
   }
-  const satelliteColors={ISS:'#b7a4ff','SO-50':'#59e1ce','RS-44':'#ffbf76'};
-  let satelliteCatalog=[];
+  const satelliteColors={25544:'#b7a4ff',27607:'#59e1ce',44909:'#ffbf76'};
+  const defaultSatellites=[{norad:25544,name:'ISS'},{norad:27607,name:'SO-50'},{norad:44909,name:'RS-44'}];
+  let trackedSatellites=defaultSatellites.map(x=>({...x})),satelliteCatalog=[];
   function satellitePrefs(){
-    return {ids:[...document.querySelectorAll('[data-satellite-id]:checked')].map(x=>x.dataset.satelliteId),
+    return {ids:trackedSatellites.map(x=>x.norad),satellites:trackedSatellites.map(x=>({...x})),
       footprints:$('satelliteFootprints')?.checked!==false,tracks:$('satelliteTracks')?.checked!==false,passes:$('satellitePasses')?.checked!==false};
+  }
+  function persistSatellitePrefs(){localStorage.setItem('hammap-satellites',JSON.stringify(satellitePrefs()));}
+  function drawSatelliteSelection(){
+    const list=$('satelliteSelectionList');if(!list)return;
+    list.replaceChildren();
+    for(const sat of trackedSatellites){
+      const row=document.createElement('div');row.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:8px';
+      const name=document.createElement('span');name.textContent=sat.name+' (NORAD '+sat.norad+')';
+      const remove=document.createElement('button');remove.type='button';remove.className='test';remove.textContent='Remove';remove.setAttribute('aria-label','Remove '+sat.name);
+      remove.addEventListener('click',()=>{trackedSatellites=trackedSatellites.filter(x=>x.norad!==sat.norad);drawSatelliteSelection();persistSatellitePrefs();loadSatellites();});
+      row.append(name,remove);list.append(row);
+    }
+    if(!trackedSatellites.length)list.textContent='No satellites selected. Search by NORAD number to add one.';
   }
   function restoreSatellitePrefs(){
     try{
       const p=JSON.parse(localStorage.getItem('hammap-satellites')||'null');
-      if(!p)return;
-      document.querySelectorAll('[data-satellite-id]').forEach(x=>x.checked=p.ids?.includes(x.dataset.satelliteId)??true);
-      for(const [id,key] of [['satelliteFootprints','footprints'],['satelliteTracks','tracks'],['satellitePasses','passes']])if(typeof p[key]==='boolean')$(id).checked=p[key];
+      if(p){
+        const saved=Array.isArray(p.satellites)?p.satellites:
+          Array.isArray(p.ids)?p.ids.map(id=>typeof id==='string'?defaultSatellites.find(x=>x.name===id):defaultSatellites.find(x=>x.norad===id)).filter(Boolean):null;
+        if(saved)trackedSatellites=saved.filter(x=>Number.isSafeInteger(x.norad)&&x.norad>0&&x.norad<=999999&&typeof x.name==='string').slice(0,20);
+        for(const [id,key] of [['satelliteFootprints','footprints'],['satelliteTracks','tracks'],['satellitePasses','passes']])if(typeof p[key]==='boolean')$(id).checked=p[key];
+      }
     }catch{}
+    drawSatelliteSelection();
   }
   function satellitePoint(record,date){
     const pv=window.satellite.propagate(record,date);
@@ -285,11 +303,11 @@
     satelliteLayer.clearLayers();
     const prefs=satellitePrefs(),now=new Date(),results=[];
     for(const item of satelliteCatalog){
-      if(!prefs.ids.includes(item.name))continue;
+      if(!prefs.ids.includes(item.norad))continue;
       try{
         const record=window.satellite.json2satrec(item.elements),point=satellitePoint(record,now);
         if(!point)continue;
-        const color=satelliteColors[item.name]||'#a78bfa';
+        const color=satelliteColors[item.norad]||'#a78bfa';
         satelliteLayer.addLayer(L.circleMarker([point.lat,point.lon],{radius:7,color:'#fff',weight:1.5,fillColor:color,fillOpacity:1}).bindTooltip(item.name+' • '+Math.round(point.height)+' km',{permanent:true,className:'ham-tip'}));
         if(prefs.footprints){
           // Split at antimeridian to avoid long polygons across the world.
@@ -315,18 +333,39 @@
     if($('satellitePassResults'))$('satellitePassResults').textContent=prefs.passes?(results.join(' | ')||'No satellites selected'):'Pass predictions disabled';
     rowStatus('satellite',prefs.ids.length+' selected','ok');
   }
+  let satelliteLoadSequence=0;
   async function loadSatellites(){
-    if(!satellitePrefs().ids.length){satelliteCatalog=[];satelliteLayer.clearLayers();rowStatus('satellite','none selected');return;}
+    const sequence=++satelliteLoadSequence,ids=satellitePrefs().ids;
+    if(!ids.length){satelliteCatalog=[];satelliteLayer.clearLayers();rowStatus('satellite','none selected');if($('satellitePassResults'))$('satellitePassResults').textContent='No satellites selected';return;}
     try{
-      const data=await getJson('/api/live/satellites?ids='+encodeURIComponent(satellitePrefs().ids.join(',')));
+      const data=await getJson('/api/live/satellites?ids='+encodeURIComponent(ids.join(',')));
+      if(sequence!==satelliteLoadSequence)return;
       satelliteCatalog=data.satellites||[];
-      renderSatellites();
-    }catch{rowStatus('satellite','orbit feed offline','warn');}
+      for(const sat of satelliteCatalog){const existing=trackedSatellites.find(x=>x.norad===sat.norad);if(existing)existing.name=sat.name;}
+      drawSatelliteSelection();renderSatellites();
+      if(data.unavailable?.length)rowStatus('satellite',data.unavailable.length+' orbits unavailable','warn');
+    }catch{if(sequence===satelliteLoadSequence)rowStatus('satellite','orbit feed offline','warn');}
   }
   restoreSatellitePrefs();
-  document.querySelectorAll('[data-satellite-id],#satelliteFootprints,#satelliteTracks,#satellitePasses').forEach(x=>x.addEventListener('change',()=>{
-    localStorage.setItem('hammap-satellites',JSON.stringify(satellitePrefs()));loadSatellites();
-  }));
+  $('satelliteLookupBtn')?.addEventListener('click',async()=>{
+    const input=$('satelliteNoradInput'),result=$('satelliteLookupResult'),raw=input.value.trim();
+    if(!/^[1-9][0-9]{0,5}$/.test(raw)){result.textContent='Enter a valid NORAD catalog number.';return;}
+    if(trackedSatellites.some(x=>x.norad===Number(raw))){result.textContent='This satellite is already tracked.';return;}
+    if(trackedSatellites.length>=20){result.textContent='Maximum 20 satellites. Remove one first.';return;}
+    const button=$('satelliteLookupBtn');button.disabled=true;result.textContent='Searching CelesTrak…';
+    try{
+      const data=await getJson('/api/live/satellite/lookup?norad='+encodeURIComponent(raw));
+      if(input.value.trim()!==raw)return;
+      const add=document.createElement('button');add.type='button';add.className='test';add.textContent='Add '+data.name;
+      result.replaceChildren(document.createTextNode(data.name+' (NORAD '+data.norad+') '),add);
+      add.addEventListener('click',()=>{
+        if(trackedSatellites.some(x=>x.norad===data.norad)||trackedSatellites.length>=20)return;
+        trackedSatellites.push({norad:data.norad,name:data.name});persistSatellitePrefs();drawSatelliteSelection();loadSatellites();result.textContent=data.name+' added to tracking.';
+      });
+    }catch(error){result.textContent='Lookup failed: '+error.message;}
+    finally{button.disabled=false;}
+  });
+  for(const id of ['satelliteFootprints','satelliteTracks','satellitePasses'])$(id)?.addEventListener('change',()=>{persistSatellitePrefs();renderSatellites();});
   setInterval(()=>{if(enabled('satellite'))renderSatellites();},60000);
   setInterval(loadSatellites,3600000);
   async function loadConfiguredFeeds(){
