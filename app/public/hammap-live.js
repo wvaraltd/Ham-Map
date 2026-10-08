@@ -308,7 +308,7 @@
         const record=window.satellite.json2satrec(item.elements),point=satellitePoint(record,now);
         if(!point)continue;
         const color=satelliteColors[item.norad]||'#a78bfa';
-        satelliteLayer.addLayer(L.circleMarker([point.lat,point.lon],{radius:7,color:'#fff',weight:1.5,fillColor:color,fillOpacity:1}).bindTooltip(item.name+' • '+Math.round(point.height)+' km',{permanent:true,className:'ham-tip'}));
+        satelliteLayer.addLayer(L.circleMarker([point.lat,point.lon],{radius:7,color:'#fff',weight:1.5,fillColor:color,fillOpacity:1}).bindTooltip(item.name+' • '+Math.round(point.height*0.621371)+' mi',{permanent:true,className:'ham-tip'}));
         if(prefs.footprints){
           // Split at antimeridian to avoid long polygons across the world.
           const poly=footprintPolygon(point),segments=[[]];
