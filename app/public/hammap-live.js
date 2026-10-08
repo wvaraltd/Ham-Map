@@ -321,13 +321,16 @@
       const x=Math.round((((lon+180)%360+360)%360)/360*(w-1));
       const y=Math.max(0,Math.min(h-1,Math.round((90-lat)/180*(h-1))));
       const index=y*w+x;
-      intensity[index]=Math.max(intensity[index],Math.min(100,v));
+      for(let dy=0;dy<2;dy++)for(let dx=0;dx<2;dx++){
+        const px=(x+dx)%w,py=Math.min(h-1,y+dy),idx=py*w+px;
+        intensity[idx]=Math.max(intensity[idx],Math.min(100,v));
+      }
       active++;
     }
     // Fill each 1-degree NOAA cell as a 2x2-pixel tile; transparent below 5%.
     for(let y=0;y<h;y++){
       for(let x=0;x<w;x++){
-        const v=intensity[Math.floor(y/2)*2*w+Math.floor(x/2)*2]||intensity[y*w+x];
+        const v=intensity[y*w+x];
         if(v<5)continue;
         const t=Math.min(1,v/100),p=(y*w+x)*4;
         const warm=Math.max(0,(t-.32)/.68),pink=Math.max(0,(t-.68)/.32);
