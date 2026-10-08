@@ -122,6 +122,11 @@ async function handler(req, res) {
     }
     if (url.pathname === '/api/health' && req.method === 'GET') return json(res, 200, { ok: true, service: 'ham-map', database: true });
     if (url.pathname === '/api/live/pota' && req.method === 'GET') {const source=(await feedSources()).pota;if(source?.provider==='disabled')return json(res,503,{error:'POTA source is disabled'});return json(res,200,{spots:await remoteJson('https://api.pota.app/spot/activator',60000)});}
+    if (url.pathname === '/api/live/repeaters' && req.method === 'GET') {
+      const data=await remoteJson('https://ara.radio/repeaters.json',300000);
+      if(!Array.isArray(data))throw Object.assign(new Error('ARA repeater directory returned invalid data'),{status:502});
+      return json(res,200,{repeaters:data.filter(r=>r.is_public!==0 && !r.deleted_at).map(r=>({id:r.id,callsign:r.callsign,frequency:r.frequency,input_frequency:r.input_frequency,offset:r.offset,tone:r.tone,band:r.band,mode:r.mode,location_name:r.location_name,nearest_city:r.nearest_city,county:r.county,state:r.state,club_affiliate:r.club_affiliate,status:r.status,latitude:r.latitude,longitude:r.longitude,needs_review:r.needs_review,notes:r.notes}))});
+    }
     if (url.pathname === '/api/live/sota' && req.method === 'GET') {
       const source=await configuredSource('sota');if(source.provider!=='custom')return json(res,503,{error:'SOTA source is not configured'});
       return json(res,200,{spots:await remoteJson(await checkedFeedUrl(source.url),60000)});
