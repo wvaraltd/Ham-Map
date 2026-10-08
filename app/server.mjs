@@ -150,7 +150,7 @@ async function handler(req, res) {
         remoteJson('https://services.swpc.noaa.gov/products/solar-wind/mag-1-day.json',120000).catch(()=>null)
       ]);
       const recent=Array.isArray(cycle)?cycle.at(-1):{};
-      return json(res,200,{kp:latestNumeric(kp,'Kp'),solarFlux:Number(recent?.['f10.7']),sunspots:Number(recent?.ssn),bz:latestNumeric(mag,'BZ')});
+      return json(res,200,{kp:latestNumeric(kp,'Kp'),solarFlux:Number(recent?.['f10.7']),sunspots:Number(recent?.ssn),bz:mag?latestNumeric(mag,'BZ'):null});
     }
     if (url.pathname === '/api/live/iss' && req.method === 'GET') {
       const source=await configuredSource('iss');let endpoint;
