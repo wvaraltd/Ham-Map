@@ -306,21 +306,53 @@
   const labelsButton=layerButton('labels');
   if(labelsButton){labelsButton.disabled=false;labelsButton.removeAttribute('aria-disabled');labelsButton.closest('.toggle-row')?.style.removeProperty('opacity');rowStatus('labels','ready','ok');labelsButton.addEventListener('click',()=>setTimeout(updateCallsignLabels,0));}
   radioMap.on('moveend zoomend',updateCallsignLabels);
+  // Render NOAA OVATION as a softly blended probability field instead of point markers.
+  // The underlying values are forecast probabilities, not a photograph of aurora.
+  function auroraImage(coordinates){
+    const w=720,h=360,source=document.createElement('canvas');
+    source.width=w;source.height=h;
+    const ctx=source.getContext('2d'),pixels=ctx.createImageData(w,h);
+    const intensity=new Float32Array(w*h);
+    let active=0;
+    for(const item of coordinates){
+      if(!Array.isArray(item)||item.length<3)continue;
+      const lon=Number(item[0]),lat=Number(item[1]),v=Number(item[2]);
+      if(!Number.isFinite(lon)||!Number.isFinite(lat)||!Number.isFinite(v)||Math.abs(lat)>90||v<5)continue;
+      const x=Math.round((((lon+180)%360+360)%360)/360*(w-1));
+      const y=Math.max(0,Math.min(h-1,Math.round((90-lat)/180*(h-1))));
+      const index=y*w+x;
+      intensity[index]=Math.max(intensity[index],Math.min(100,v));
+      active++;
+    }
+    // Fill each 1-degree NOAA cell as a 2x2-pixel tile; transparent below 5%.
+    for(let y=0;y<h;y++){
+      for(let x=0;x<w;x++){
+        const v=intensity[Math.floor(y/2)*2*w+Math.floor(x/2)*2]||intensity[y*w+x];
+        if(v<5)continue;
+        const t=Math.min(1,v/100),p=(y*w+x)*4;
+        const warm=Math.max(0,(t-.32)/.68),pink=Math.max(0,(t-.68)/.32);
+        pixels.data[p]=Math.round(45+190*warm+20*pink);
+        pixels.data[p+1]=Math.round(215-90*warm-60*pink);
+        pixels.data[p+2]=Math.round(112+25*warm+90*pink);
+        pixels.data[p+3]=Math.round(Math.min(215,28+190*Math.pow(t,.8)));
+      }
+    }
+    ctx.putImageData(pixels,0,0);
+    const output=document.createElement('canvas');output.width=w;output.height=h;
+    const out=output.getContext('2d');
+    out.filter='blur(7px)';out.drawImage(source,0,0);
+    out.filter='blur(2px)';out.globalAlpha=.8;out.drawImage(source,0,0);
+    return {url:output.toDataURL('image/png'),active};
+  }
   async function loadAurora(){
     try{
       const data=await getJson('/api/live/aurora');
+      if(!Array.isArray(data.coordinates))throw new Error('Invalid aurora forecast');
+      const image=auroraImage(data.coordinates);
       auroraLayer.clearLayers();
-      let count=0;
-      for(const item of data.coordinates){
-        if(!Array.isArray(item)||item.length<3)continue;
-        const lon=Number(item[0]),lat=Number(item[1]),value=Number(item[2]);
-        if(!Number.isFinite(lat)||!Number.isFinite(lon)||!Number.isFinite(value)||value<10||Math.abs(lat)>90)continue;
-        const color=value>=70?'#ff5478':value>=40?'#ffb34d':'#65e0b2';
-        auroraLayer.addLayer(L.circleMarker([lat,lon>180?lon-360:lon],{radius:2+value/30,stroke:false,fillColor:color,fillOpacity:Math.min(.75,.15+value/140),interactive:false}));
-        count++;
-      }
-      rowStatus('aurora',count+' forecast cells','ok');
-      layerButton('aurora')?.closest('.toggle-row')?.setAttribute('title','NOAA OVATION forecast for '+(data.forecast_time||'latest available'));
+      auroraLayer.addLayer(L.imageOverlay(image.url,[[-90,-180],[90,180]],{opacity:.82,interactive:false,className:'hammap-aurora-glow'}));
+      rowStatus('aurora',image.active+' forecast cells','ok');
+      layerButton('aurora')?.closest('.toggle-row')?.setAttribute('title','NOAA OVATION probability glow; forecast '+(data.forecast_time||'latest available'));
     }catch{rowStatus('aurora','feed offline','warn');}
   }
   const auroraButton=layerButton('aurora');
