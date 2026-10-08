@@ -238,7 +238,7 @@
     return {ids:trackedSatellites.map(x=>x.norad),satellites:trackedSatellites.map(x=>({...x})),
       footprints:$('satelliteFootprints')?.checked!==false,tracks:$('satelliteTracks')?.checked!==false,passes:$('satellitePasses')?.checked!==false};
   }
-  function persistSatellitePrefs(){localStorage.setItem('hammap-satellites',JSON.stringify(satellitePrefs()));}
+  function persistSatellitePrefs(){localStorage.setItem('hammap-satellites',JSON.stringify(satellitePrefs()));lastSatellitePrefs=localStorage.getItem('hammap-satellites');}
   function drawSatelliteSelection(){
     const list=$('satelliteSelectionList');if(!list)return;
     list.replaceChildren();
@@ -366,7 +366,16 @@
     finally{button.disabled=false;}
   });
   for(const id of ['satelliteFootprints','satelliteTracks','satellitePasses'])$(id)?.addEventListener('change',()=>{persistSatellitePrefs();renderSatellites();});
-  setInterval(()=>{if(enabled('satellite'))renderSatellites();},60000);
+  // Explorer saves to the same localStorage key; update this map on return or across tabs.
+  let lastSatellitePrefs=localStorage.getItem('hammap-satellites');
+  function syncSatelliteExplorer(){
+    const current=localStorage.getItem('hammap-satellites');
+    if(current===lastSatellitePrefs)return;
+    lastSatellitePrefs=current;restoreSatellitePrefs();loadSatellites();
+  }
+  window.addEventListener('focus',syncSatelliteExplorer);
+  window.addEventListener('storage',event=>{if(event.key==='hammap-satellites')syncSatelliteExplorer();});
+    setInterval(()=>{if(enabled('satellite'))renderSatellites();},60000);
   setInterval(loadSatellites,3600000);
   async function loadConfiguredFeeds(){
     if($('dxProvider')?.value==='custom')try{const data=await getJson('/api/live/dx'),spots=Array.isArray(data)?data:(data.spots||[]);dxLayer.clearLayers();for(const raw of spots){const spot=normalizeSpot(raw,'dx');if(spot&&(!selectedBand||!spot.band||spot.band===selectedBand))dxLayer.addLayer(L.marker([spot.lat,spot.lon],{icon:icon('dx-dot')}).bindTooltip(`${safe(spot.call)} • ${safe(spot.freq)} ${safe(spot.mode)}`,{className:'ham-tip'}));}rowStatus('dx',`${dxLayer.getLayers().length} spots`,'ok');}catch{dxLayer.clearLayers();rowStatus('dx','offline','warn');}
