@@ -10,6 +10,8 @@
   let liveSuccesses = 0;
   let liveFailures = 0;
 
+  const auroraLayer = L.layerGroup();
+  leafletLayers.aurora = auroraLayer;
   const repeatersLayer = L.layerGroup();
   leafletLayers.repeaters = repeatersLayer;
   const statesLayer = L.geoJSON(null, { style: { color:'#7bc8ff', weight:1.25, opacity:.9, fillOpacity:0 } });
@@ -296,7 +298,7 @@
   };
   $('endActivation').onclick=()=>{const a=JSON.parse(localStorage.getItem('hammap-activation')||'null');if(a){a.active=false;a.ended=new Date().toISOString();localStorage.setItem('hammap-activation',JSON.stringify(a));}updateActivationState();toast('Portable activation ended')};
 
-  for (const name of ['dlayer','aurora','zones']) {
+  for (const name of ['dlayer','zones']) {
     const button=layerButton(name), row=button?.closest('.toggle-row');
     if(button){button.classList.remove('on');button.disabled=true;button.setAttribute('aria-disabled','true');}
     if(row){row.title='A live data source is not configured';row.style.opacity='.55';rowStatus(name,'not set');}
@@ -304,6 +306,31 @@
   const labelsButton=layerButton('labels');
   if(labelsButton){labelsButton.disabled=false;labelsButton.removeAttribute('aria-disabled');labelsButton.closest('.toggle-row')?.style.removeProperty('opacity');rowStatus('labels','ready','ok');labelsButton.addEventListener('click',()=>setTimeout(updateCallsignLabels,0));}
   radioMap.on('moveend zoomend',updateCallsignLabels);
+  async function loadAurora(){
+    try{
+      const data=await getJson('/api/live/aurora');
+      auroraLayer.clearLayers();
+      let count=0;
+      for(const item of data.coordinates){
+        if(!Array.isArray(item)||item.length<3)continue;
+        const lon=Number(item[0]),lat=Number(item[1]),value=Number(item[2]);
+        if(!Number.isFinite(lat)||!Number.isFinite(lon)||!Number.isFinite(value)||value<10||Math.abs(lat)>90)continue;
+        const color=value>=70?'#ff5478':value>=40?'#ffb34d':'#65e0b2';
+        auroraLayer.addLayer(L.circleMarker([lat,lon>180?lon-360:lon],{radius:2+value/30,stroke:false,fillColor:color,fillOpacity:Math.min(.75,.15+value/140),interactive:false}));
+        count++;
+      }
+      rowStatus('aurora',count+' forecast cells','ok');
+      layerButton('aurora')?.closest('.toggle-row')?.setAttribute('title','NOAA OVATION forecast for '+(data.forecast_time||'latest available'));
+    }catch{rowStatus('aurora','feed offline','warn');}
+  }
+  const auroraButton=layerButton('aurora');
+  if(auroraButton){
+    auroraButton.disabled=false;auroraButton.removeAttribute('aria-disabled');
+    auroraButton.closest('.toggle-row')?.style.removeProperty('opacity');
+    rowStatus('aurora','ready');
+    auroraButton.addEventListener('click',()=>setTimeout(()=>{if(enabled('aurora'))loadAurora();},0));
+    setInterval(()=>{if(enabled('aurora'))loadAurora();},300000);
+  }
   async function loadRepeaters() {
     try {
       const data=await getJson('/api/live/repeaters');
@@ -344,7 +371,7 @@
   $('allstarNode')?.addEventListener('input',()=>{if($('allstarNode').value.replace(/\D/g,'')&&$('allstarProvider')?.value==='disabled')$('allstarProvider').value='official';updateSourceFields();});
   $('allstarProvider')?.addEventListener('change',()=>{updateSourceFields();});
   loadLocal();
-  for (const name of ['dlayer','aurora','zones']) layerButton(name)?.classList.remove('on');
+  for (const name of ['dlayer','zones']) layerButton(name)?.classList.remove('on');
   updateSourceFields();
   loadPsk();
   $('callsign')?.addEventListener('change',loadPsk);
