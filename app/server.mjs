@@ -140,6 +140,16 @@ async function handler(req, res) {
       if(!/^[A-Z]{2}$/.test(area))return json(res,400,{error:'Invalid weather area'});
       return json(res,200,await remoteJson(`https://api.weather.gov/alerts/active?area=${area}`,60000));
     }
+    if (url.pathname === '/api/live/earthquakes' && req.method === 'GET') {
+      const data=await remoteJson('https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_day.geojson',120000);
+      return json(res,200,{source:'USGS',features:Array.isArray(data.features)?data.features.slice(0,600):[]});
+    }
+    if (url.pathname === '/api/live/radar' && req.method === 'GET') {
+      const data=await remoteJson('https://api.rainviewer.com/public/weather-maps.json',300000);
+      const frame=data?.radar?.past?.at(-1);
+      if(!frame||!/^\\/v2\\/radar\\/\\d+$/.test(frame.path))return json(res,502,{error:'Radar frame unavailable'});
+      return json(res,200,{source:'RainViewer',time:frame.time,path:frame.path});
+    }
     if (url.pathname === '/api/live/aurora' && req.method === 'GET') {
       const data=await remoteJson('https://services.swpc.noaa.gov/json/ovation_aurora_latest.json',300000);
       if(!Array.isArray(data.coordinates))throw Object.assign(new Error('NOAA aurora grid unavailable'),{status:502});
