@@ -242,7 +242,7 @@
     function renderPsk(){
     if($('dxProvider')?.value==='custom')return;
     dxLayer.clearLayers();
-    const mode=$('digitalModeFilter')?.value||'ALL';
+    const mode=document.querySelector('.digital-filter.on')?.dataset.digitalMode||'ALL';
     const filtered=pskReports.filter(r=>pskBand(r.frequency)===selectedBand&&(mode==='ALL'||String(r.mode||'').toUpperCase()===mode));
     for(const r of filtered.slice(0,500)){
       const tx=pskGridPoint(r.senderLocator),rx=pskGridPoint(r.receiverLocator);
@@ -629,7 +629,12 @@
   window.addEventListener('hammap-settings-saved',()=>{updateSourceFields();loadConfiguredFeeds();});
   $('allstarNode')?.addEventListener('input',()=>{if($('allstarNode').value.replace(/\D/g,'')&&$('allstarProvider')?.value==='disabled')$('allstarProvider').value='official';updateSourceFields();});
   $('allstarProvider')?.addEventListener('change',()=>{updateSourceFields();});
-  $('digitalModeFilter')?.addEventListener('change',renderPsk);
+  document.querySelectorAll('.digital-filter').forEach(button=>{
+    button.addEventListener('click',()=>{
+      document.querySelectorAll('.digital-filter').forEach(other=>other.classList.toggle('on',other===button));
+      renderPsk();
+    });
+  });
   loadLocal();
   for (const name of ['dlayer','zones']) layerButton(name)?.classList.remove('on');
   updateSourceFields();
