@@ -222,7 +222,24 @@
     return '';
   }
   let pskReports=[];
-  function renderPsk(){
+  function updateDxCard(state='ok'){
+    const card=$('dxCard');if(!card)return;
+    const badge=card.querySelector('.status'),detail=card.querySelector('.meta');
+    if($('dxProvider')?.value==='custom'){
+      badge.textContent='CUSTOM FEED';
+      detail.textContent='DX cluster is configured; view its spots on the map.';
+      return;
+    }
+    const call=$('callsign')?.value?.trim().toUpperCase();
+    if(!call){badge.textContent='SET CALLSIGN';detail.textContent='Enter your station callsign in Settings to load PSK Reporter reception spots.';return;}
+    if(state==='offline'){badge.textContent='FEED OFFLINE';detail.textContent='PSK Reporter is temporarily unavailable. Retrying automatically.';return;}
+    if(!pskReports.length){badge.textContent='NO RECENT SPOTS';detail.textContent='No PSK Reporter receptions involving '+call+' in the last 30 minutes. Checking again automatically.';return;}
+    const recent=[...pskReports].sort((a,b)=>Number(b.time||0)-Number(a.time||0));
+    const current=recent[0],band=pskBand(current.frequency);
+    badge.textContent=pskReports.length+' REPORTS';
+    detail.textContent=(current.senderCallsign||'?')+' → '+(current.receiverCallsign||'?')+' • '+(band||((Number(current.frequency)/1e6).toFixed(3)+' MHz'))+' • '+(current.mode||'digital')+' • '+pskReports.length+' receptions in 30 min';
+  }
+    function renderPsk(){
     if($('dxProvider')?.value==='custom')return;
     dxLayer.clearLayers();
     const filtered=pskReports.filter(r=>pskBand(r.frequency)===selectedBand);
@@ -236,6 +253,7 @@
     callsignPoints=callsignPoints.filter(p=>p.kind!=='psk').concat(filtered.flatMap(r=>{const tx=pskGridPoint(r.senderLocator),rx=pskGridPoint(r.receiverLocator);return [[tx,r.senderCallsign],[rx,r.receiverCallsign]].filter(x=>x[0]).map(x=>({lat:x[0][0],lon:x[0][1],call:x[1],kind:'psk'}));}));
     updateCallsignLabels();
     rowStatus('dx',filtered.length+' reports','ok');
+    updateDxCard();
     document.querySelectorAll('.band').forEach(button=>{
       const band=button.querySelector('strong')?.textContent?.trim();
       if(!band)return;
@@ -246,12 +264,12 @@
   async function loadPsk(){
     if($('dxProvider')?.value==='custom')return;
     const call=$('callsign')?.value?.trim().toUpperCase();
-    if(!call){rowStatus('dx','enter callsign');return;}
+    if(!call){rowStatus('dx','enter callsign');updateDxCard();return;}
     try{
       const data=await getJson('/api/live/psk?call='+encodeURIComponent(call));
       pskReports=Array.isArray(data.reports)?data.reports:[];
       renderPsk();
-    }catch{rowStatus('dx','feed offline','warn');}
+    }catch{rowStatus('dx','feed offline','warn');updateDxCard('offline');}
   }
   function updateSourceFields() {
     document.querySelectorAll('[data-source-url]').forEach(field=>{const name=field.dataset.sourceUrl,select=$(`${name}Provider`);field.hidden=select?.value!=='custom';});
