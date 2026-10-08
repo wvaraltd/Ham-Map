@@ -1,0 +1,16 @@
+{
+  "spots": [
+    {
+      "activator": "TEST1",
+      "summitCode": "EXAMPLE/SUMMIT-001",
+      "frequency": "14.062",
+      "mode": "CW",
+      "latitude": 38.0,
+      "longitude": -80.0,
+      "spottedAt": "2026-10-08T00:00:00Z",
+      "sample": true
+    }
+  ],
+  "sample": true,
+  "notice": "Synthetic test data; not real SOTA spots"
+}
