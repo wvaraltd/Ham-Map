@@ -152,6 +152,29 @@ async function handler(req, res) {
       if(source.provider==='wheretheiss')endpoint='https://api.wheretheiss.at/v1/satellites/25544';else if(source.provider==='custom')endpoint=await checkedFeedUrl(source.url);else return json(res,503,{error:'ISS source is not configured'});
       return json(res,200,await remoteJson(endpoint,15000));
     }
+    if (url.pathname === '/api/live/psk' && req.method === 'GET') {
+      const call=cleanCall(url.searchParams.get('call'));
+      if(!validCall(call))return json(res,400,{error:'Enter a valid station callsign'});
+      const key='psk:'+call, cached=feedCache.get(key);
+      if(cached && cached.expires>Date.now())return json(res,200,cached.data);
+      const endpoint='https://retrieve.pskreporter.info/query?'+new URLSearchParams({callsign:call,flowStartSeconds:'-1800',rptlimit:'500',rronly:'1',noactive:'1'});
+      const response=await fetch(endpoint,{signal:AbortSignal.timeout(20000),headers:{'user-agent':'HamMap/0.3 (amateur radio dashboard)','accept':'application/xml,text/xml,*/*'}});
+      if(!response.ok)throw Object.assign(new Error('PSK Reporter returned HTTP '+response.status),{status:502});
+      const xml=await response.text();
+      if(xml.length>5000000)throw Object.assign(new Error('PSK Reporter response too large'),{status:502});
+      if(!/<receptionReports\\b/i.test(xml))throw Object.assign(new Error('Invalid PSK Reporter XML'),{status:502});
+      const reports=[];
+      for(const match of xml.matchAll(/<receptionReport\\s+([^>]*?)\\/?>/gi)){
+        const attributes={};
+        for(const attr of match[1].matchAll(/([A-Za-z][A-Za-z0-9]*)="([^"]*)"/g))attributes[attr[1]]=attr[2];
+        const freq=Number(attributes.frequency);
+        if(!Number.isFinite(freq)||freq<=0)continue;
+        reports.push({senderCallsign:attributes.senderCallsign||'',receiverCallsign:attributes.receiverCallsign||'',senderLocator:attributes.senderLocator||'',receiverLocator:attributes.receiverLocator||'',frequency:freq,mode:attributes.mode||'',time:Number(attributes.flowStartSeconds)||0,snr:attributes.sNR??attributes.snr??null});
+      }
+      const data={source:'PSK Reporter',callsign:call,reports,updated:new Date().toISOString()};
+      feedCache.set(key,{data,expires:Date.now()+300000});
+      return json(res,200,data);
+    }
     if (url.pathname === '/api/live/dx' && req.method === 'GET') {const source=await configuredSource('dx');if(source.provider!=='custom')return json(res,503,{error:'DX source is not configured'});return json(res,200,await remoteJson(await checkedFeedUrl(source.url),30000));}
     if (url.pathname === '/api/live/mesh' && req.method === 'GET') {const source=await configuredSource('mesh');if(source.provider!=='custom')return json(res,503,{error:'Mesh source is not configured'});return json(res,200,await remoteJson(await checkedFeedUrl(source.url,{local:true}),15000));}
     if (url.pathname === '/api/live/allstar' && req.method === 'GET') {
