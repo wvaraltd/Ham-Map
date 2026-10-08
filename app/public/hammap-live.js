@@ -242,7 +242,8 @@
     function renderPsk(){
     if($('dxProvider')?.value==='custom')return;
     dxLayer.clearLayers();
-    const filtered=pskReports.filter(r=>pskBand(r.frequency)===selectedBand);
+    const mode=$('digitalModeFilter')?.value||'ALL';
+    const filtered=pskReports.filter(r=>pskBand(r.frequency)===selectedBand&&(mode==='ALL'||String(r.mode||'').toUpperCase()===mode));
     for(const r of filtered.slice(0,500)){
       const tx=pskGridPoint(r.senderLocator),rx=pskGridPoint(r.receiverLocator);
       if(!tx||!rx)continue;
@@ -252,7 +253,7 @@
     }
     callsignPoints=callsignPoints.filter(p=>p.kind!=='psk').concat(filtered.flatMap(r=>{const tx=pskGridPoint(r.senderLocator),rx=pskGridPoint(r.receiverLocator);return [[tx,r.senderCallsign],[rx,r.receiverCallsign]].filter(x=>x[0]).map(x=>({lat:x[0][0],lon:x[0][1],call:x[1],kind:'psk'}));}));
     updateCallsignLabels();
-    rowStatus('dx',filtered.length+' reports','ok');
+    rowStatus('dx',filtered.length+' '+(mode==='ALL'?'digital':mode)+' reports','ok');
     updateDxCard();
     document.querySelectorAll('.band').forEach(button=>{
       const band=button.querySelector('strong')?.textContent?.trim();
@@ -628,6 +629,7 @@
   window.addEventListener('hammap-settings-saved',()=>{updateSourceFields();loadConfiguredFeeds();});
   $('allstarNode')?.addEventListener('input',()=>{if($('allstarNode').value.replace(/\D/g,'')&&$('allstarProvider')?.value==='disabled')$('allstarProvider').value='official';updateSourceFields();});
   $('allstarProvider')?.addEventListener('change',()=>{updateSourceFields();});
+  $('digitalModeFilter')?.addEventListener('change',renderPsk);
   loadLocal();
   for (const name of ['dlayer','zones']) layerButton(name)?.classList.remove('on');
   updateSourceFields();
