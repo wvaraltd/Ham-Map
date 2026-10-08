@@ -222,7 +222,8 @@
   }
   function updateSourceFields() {
     document.querySelectorAll('[data-source-url]').forEach(field=>{const name=field.dataset.sourceUrl,select=$(`${name}Provider`);field.hidden=select?.value!=='custom';});
-    for(const [sourceName,layerName] of [['sota','sota'],['iss','satellite'],['allstar','allstar'],['mesh','meshcore']]){const button=layerButton(layerName),configured=$(`${sourceName}Provider`)?.value!=='disabled';if(button){button.disabled=!configured;button.setAttribute('aria-disabled',String(!configured));if(!configured)setLayer(layerName,false);}const row=button?.closest('.toggle-row');if(row){row.style.opacity=configured?'1':'.55';rowStatus(layerName,configured?'ready':'not set',configured?'ok':'');}}
+    for(const [sourceName,layerName] of [['sota','sota'],['allstar','allstar'],['mesh','meshcore']]){const button=layerButton(layerName),configured=$(`${sourceName}Provider`)?.value!=='disabled';if(button){button.disabled=!configured;button.setAttribute('aria-disabled',String(!configured));if(!configured)setLayer(layerName,false);}const row=button?.closest('.toggle-row');if(row){row.style.opacity=configured?'1':'.55';rowStatus(layerName,configured?'ready':'not set',configured?'ok':'');}}
+    const satButton=layerButton('satellite');if(satButton){satButton.disabled=false;satButton.removeAttribute('aria-disabled');satButton.closest('.toggle-row')?.style.removeProperty('opacity');}
     updateCounters();
   }
   async function testDataSources() {
@@ -307,7 +308,7 @@
         }
         if(prefs.passes){
           const pass=satelliteNextPass(record);
-          results.push(pass?item.name+': '+pass.rise.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})+'–'+pass.set.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})+' (max '+Math.round(pass.max)+'°) UTC/local per browser':item.name+': no pass predicted in 24 h');
+          results.push(pass?item.name+': '+pass.rise.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})+'–'+pass.set.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})+' (max '+Math.round(pass.max)+'° elevation)':item.name+': no pass predicted in 24 h');
         }
       }catch(e){results.push(item.name+': orbit unavailable');}
     }
