@@ -165,7 +165,13 @@ async function handler(req, res) {
       const isCounty=url.pathname.endsWith('/counties'), layer=isCounty?1:0;
       const query=new URLSearchParams({where:'1=1',geometry:`${west},${south},${east},${north}`,geometryType:'esriGeometryEnvelope',inSR:'4326',outSR:'4326',spatialRel:'esriSpatialRelIntersects',outFields:'*',returnGeometry:'true',maxAllowableOffset:isCounty?'0.002':'0.01',f:'geojson'});
       const endpoint=`https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/${layer}/query?${query}`;
-      return json(res,200,await remoteJson(endpoint,86400000));
+      const boundaryResponse=await fetch(endpoint,{signal:AbortSignal.timeout(20000),headers:{'user-agent':'curl/8.0','accept':'*/*'}});
+      if(!boundaryResponse.ok)throw Object.assign(new Error('Census boundary service HTTP '+boundaryResponse.status),{status:502});
+      const boundaryText=await boundaryResponse.text();
+      if(boundaryText.length>16000000)throw Object.assign(new Error('Census boundary response too large'),{status:502});
+      const boundaryData=JSON.parse(boundaryText);
+      if(boundaryData.type!=='FeatureCollection'||!Array.isArray(boundaryData.features))throw Object.assign(new Error('Census boundary query failed: '+(boundaryData.error?.message||'Invalid GeoJSON response')),{status:502});
+      return json(res,200,boundaryData);
     }
     if (url.pathname === '/api/auth/session' && req.method === 'GET') {
       const user = await auth(req); return json(res, 200, { authenticated: Boolean(user), setupRequired: (await operatorCount()) === 0, callsign: user?.callsign || null });
