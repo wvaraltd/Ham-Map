@@ -30,6 +30,10 @@
   }
   function updateAccountUi() {
     const btn = $('accountBtn');
+    for (const id of ['logBtn','quickLogBtn']) {
+      const control=$(id);
+      if(control){control.title=state.authenticated?'Log a QSO':'Sign in to log a QSO';control.setAttribute('aria-label',control.title);}
+    }
     btn.innerHTML = state.authenticated ? `● <span>${escapeHtml(state.callsign)}</span>` : '♙ <span>Account</span>';
     $('accountTitle').textContent = state.authenticated ? 'Operator account' : state.setupRequired ? 'Create operator account' : 'Operator login';
     $('accountStatus').textContent = state.authenticated ? `Cloud log synchronized • ${state.callsign}` : state.setupRequired ? 'First-run setup' : 'Sign in to synchronize';
@@ -49,7 +53,7 @@
       Object.assign(state, result, { setupRequired: false }); $('callsign').value = state.callsign; $('accountPassword').value = ''; updateAccountUi(); applyStation(); $('accountModal').classList.remove('open'); toast(`Signed in as ${state.callsign}`); await syncSettingsToServer(); await renderRemoteLog();
     } catch (error) { $('accountError').textContent = error.message; }
   }
-  async function logout() { await api('/api/auth/logout', { method: 'POST', body: '{}' }); Object.assign(state, { authenticated: false, callsign: null }); updateAccountUi(); $('accountModal').classList.remove('open'); toast('Signed out'); }
+  async function logout() { await api('/api/auth/logout', { method: 'POST', body: '{}' }); Object.assign(state, { authenticated: false, callsign: null }); $('logModal').classList.remove('open'); $('logModal').setAttribute('aria-hidden','true'); updateAccountUi(); $('accountModal').classList.remove('open'); toast('Signed out'); }
   function feedSources() { const value=id=>$(id)?.value||''; return {pota:{provider:value('potaProvider')},solar:{provider:value('solarProvider')},nws:{provider:value('nwsProvider')},boundaries:{provider:value('boundaryProvider')},sota:{provider:value('sotaProvider'),url:value('sotaUrl')},dx:{provider:value('dxProvider'),url:value('dxUrl')},iss:{provider:value('issProvider'),url:value('issUrl')},allstar:{provider:value('allstarProvider'),url:value('allstarUrl'),node:value('allstarNode')},mesh:{provider:value('meshProvider'),url:value('meshUrl')}}; }
   function stationSettings() { return { callsign: $('callsign').value.toUpperCase(), grid: $('grid').value.toUpperCase(), location: $('location').value, latitude: Number($('latitude').value), longitude: Number($('longitude').value), weatherArea: $('weatherArea').value, operationMode: $('operationMode').value, potaRef: $('potaRef').value.toUpperCase(), sotaRef: $('sotaRef').value.toUpperCase(), portableGrid: $('portableGrid').value.toUpperCase(), activationName: $('activationName').value, feedSources:feedSources() }; }
   async function syncSettingsToServer() { if (!state.authenticated) return; await api('/api/settings', { method: 'PUT', body: JSON.stringify(stationSettings()) }); }
@@ -78,6 +82,21 @@
   const originalSave = $('saveSettings').onclick; $('saveSettings').onclick = async () => { originalSave?.(); try { await syncSettingsToServer(); window.dispatchEvent(new Event('hammap-settings-saved')); } catch (error) { toast(`Settings not synchronized: ${error.message}`); } };
   $('saveQso').onclick = saveRemoteQso;
   $('testPush').onclick = async () => { if (!state.authenticated) return openAccount(); try { await api('/api/notifications/pushover/test', { method: 'POST', body: JSON.stringify({ userKey: $('pushoverUserKey').value, appToken: $('pushoverAppToken').value }) }); toast('Pushover test sent'); } catch (error) { toast(error.message); } };
-  const originalOpen = $('quickLogBtn').onclick; $('quickLogBtn').onclick = () => { originalOpen?.(); if (state.authenticated) renderRemoteLog().catch(() => {}); };
+  // The public map is read-only. Never open the logging form without a valid session.
+  async function guardedOpenLog() {
+    try {
+      const session=await api('/api/auth/session',{method:'GET',headers:{}});
+      Object.assign(state,session);
+      updateAccountUi();
+      if (!state.authenticated) { openAccount(); return; }
+      $('qsoTime').value=new Date().toISOString().slice(0,16);
+      $('logModal').classList.add('open');
+      $('logModal').setAttribute('aria-hidden','false');
+      await renderRemoteLog();
+      $('qsoCall').focus();
+    } catch(error) { toast('Unable to verify login'); }
+  }
+  $('logBtn').onclick=guardedOpenLog;
+  $('quickLogBtn').onclick=guardedOpenLog;
   refreshSession();
 })();
