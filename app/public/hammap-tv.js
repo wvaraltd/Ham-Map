@@ -22,13 +22,36 @@ const fullscreen=document.createElement('button');fullscreen.type='button';fulls
 const home=document.createElement('button');home.type='button';home.textContent='⌖ World';home.title='Fit world map';
 fullscreen.addEventListener('click',()=>{if(!document.fullscreenElement)document.documentElement.requestFullscreen?.().catch(()=>{});else document.exitFullscreen?.();});
 home.addEventListener('click',()=>radioMap.setView([20,0],Math.max(2,radioMap.getMinZoom()),{animate:false}));
-controls.append(fullscreen,home);document.body.append(controls);
+const rotate=document.createElement('button');rotate.type='button';rotate.title='Cycle through TV display profiles every 30 seconds';
+const profiles=[
+{name:'WORLD',center:[20,0],zoom:2,layers:['night','gray','satellite','aurora']},
+{name:'DX / HF',center:[20,0],zoom:2,layers:['night','gray','dx','labels','paths']},
+{name:'WEATHER',center:[20,0],zoom:2,layers:['night','weather','radar','earthquakes']},
+{name:'SATELLITES',center:[20,0],zoom:2,layers:['night','satellite']}
+];
+let rotating=localStorage.getItem('hammap-tv-rotation')==='1',profileIndex=0;
+const applyProfile=()=>{
+const p=profiles[profileIndex++%profiles.length];
+for(const b of document.querySelectorAll('#layersPanel [data-layer]')){
+if(!['night','gray','satellite','aurora','dx','labels','paths','weather','radar','earthquakes'].includes(b.dataset.layer))continue;
+const wanted=p.layers.includes(b.dataset.layer);
+if(!b.disabled&&b.classList.contains('on')!==wanted)b.click();
+}
+radioMap.setView(p.center,p.zoom,{animate:false});state.textContent=p.name+' PROFILE';
+};
+const updateRotate=()=>{rotate.textContent=rotating?'⏸ Stop rotation':'▶ Rotate views';localStorage.setItem('hammap-tv-rotation',rotating?'1':'0');};
+rotate.addEventListener('click',()=>{rotating=!rotating;updateRotate();if(rotating)applyProfile();});
+updateRotate();
+controls.append(fullscreen,home,rotate);document.body.append(controls);
+setInterval(()=>{if(rotating)applyProfile();},30000);
+if(rotating)setTimeout(applyProfile,2000);
+
 setTimeout(()=>controls.classList.add('auto-hide'),12000);
 document.addEventListener('fullscreenchange',()=>{fullscreen.textContent=document.fullscreenElement?'⛶ Exit fullscreen':'⛶ Fullscreen';setTimeout(()=>radioMap.invalidateSize(),100);});
 
 setInterval(()=>{time.textContent=new Date().toLocaleTimeString('en-GB',{timeZone:'UTC',hour12:false})+' UTC';},1000);
 const sync=message=>{
-if(!message||!Array.isArray(message.layers)||!Array.isArray(message.center))return;
+if(rotating||!message||!Array.isArray(message.layers)||!Array.isArray(message.center))return;
 for(const b of document.querySelectorAll('#layersPanel [data-layer]')){
 const wanted=message.layers.includes(b.dataset.layer);
 if(b.classList.contains('on')!==wanted&&!b.disabled)b.click();
