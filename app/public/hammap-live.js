@@ -308,17 +308,33 @@
     const ecef=window.satellite.eciToEcf(point.eci,point.gmst);
     return window.satellite.ecfToLookAngles(observer,ecef).elevation*180/Math.PI;
   }
-  function satelliteNextPass(record){
-    const start=Date.now(),step=60000,limit=24*60;
-    let rise=null,max=-90,peak=null;
+  function satelliteNextPass(record,startMs=Date.now()){
+    const step=60000,limit=24*60;
+    let rise=null,max=-90,peak=null,previousAbove=false;
     for(let i=0;i<=limit;i++){
-      const when=new Date(start+i*step),point=satellitePoint(record,when);
+      const when=new Date(startMs+i*step),point=satellitePoint(record,when);
       if(!point)continue;
-      const el=satelliteElevation(point);
-      if(el>0){if(!rise)rise=when;if(el>max){max=el;peak=when;}}
-      else if(rise)return {rise,peak,set:when,max};
+      const el=satelliteElevation(point),above=el>0;
+      if(above){if(!previousAbove)rise=when;if(el>max){max=el;peak=when;}}
+      else if(previousAbove&&rise)return {rise,peak,set:when,max,ongoing:rise.getTime()===startMs};
+      previousAbove=above;
     }
     return null;
+  }
+  const passCache=new Map();
+  function updateNextSatelliteCard(passList){
+    const card=$('issCard');if(!card)return;
+    const status=card.querySelector('.status'),detail=card.querySelector('.meta');
+    if(!satellitePrefs().ids.length){status.textContent='NONE SELECTED';detail.textContent='Select satellites in Satellite Explorer.';return;}
+    if(!$('callsign')?.value.trim()||!Number.isFinite(Number($('latitude')?.value))||!Number.isFinite(Number($('longitude')?.value))){
+      status.textContent='SET QTH';detail.textContent='Configure your station latitude and longitude in Settings to calculate passes.';return;
+    }
+    if(!passList.length){status.textContent='NO PASS';detail.textContent='No above-horizon pass found in the next 24 hours for the selected satellites.';return;}
+    passList.sort((a,b)=>a.pass.rise-b.pass.rise);
+    const {name,pass}=passList[0],now=Date.now(),minutes=Math.max(0,Math.round((pass.rise-now)/60000));
+    status.textContent=pass.ongoing?'OVERHEAD':minutes<1?'IMMINENT':'IN '+minutes+' MIN';
+    const clock=d=>d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+    detail.textContent=name+' • '+(pass.ongoing?'Currently above horizon':'Rise '+clock(pass.rise))+' • Set '+clock(pass.set)+' • Max elevation '+Math.round(pass.max)+'° (local time)';
   }
   function footprintPolygon(point){
     const R=6371,alt=Math.max(0,point.height),radius=Math.acos(R/(R+alt));
@@ -334,7 +350,7 @@
   function renderSatellites(){
     if(!window.satellite)return rowStatus('satellite','orbit library offline','warn');
     satelliteLayer.clearLayers();
-    const prefs=satellitePrefs(),now=new Date(),results=[];
+    const prefs=satellitePrefs(),now=new Date(),results=[],upcoming=[];
     for(const item of satelliteCatalog){
       if(!prefs.ids.includes(item.norad))continue;
       try{
@@ -357,19 +373,27 @@
           }
           if(segment.length>1)satelliteLayer.addLayer(L.polyline(segment,{color,weight:1.5,opacity:.7,interactive:false}));
         }
-        if(prefs.passes){
-          const pass=satelliteNextPass(record);
+        {
+          const key=item.norad+':'+station.lat.toFixed(4)+':'+station.lon.toFixed(4);
+          let cached=passCache.get(key);
+          if(!cached||Date.now()-cached.calculated>180000||cached.pass&&cached.pass.set<Date.now()){
+            cached={calculated:Date.now(),pass:satelliteNextPass(record)};
+            passCache.set(key,cached);
+          }
+          const pass=cached.pass;
+          if(pass)upcoming.push({name:item.name,pass});
           results.push(pass?item.name+': '+pass.rise.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})+'–'+pass.set.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})+' (max '+Math.round(pass.max)+'° elevation)':item.name+': no pass predicted in 24 h');
         }
       }catch(e){results.push(item.name+': orbit unavailable');}
     }
+    updateNextSatelliteCard(upcoming);
     if($('satellitePassResults'))$('satellitePassResults').textContent=prefs.passes?(results.join(' | ')||'No satellites selected'):'Pass predictions disabled';
     rowStatus('satellite',prefs.ids.length+' selected','ok');
   }
   let satelliteLoadSequence=0;
   async function loadSatellites(){
     const sequence=++satelliteLoadSequence,ids=satellitePrefs().ids;
-    if(!ids.length){satelliteCatalog=[];satelliteLayer.clearLayers();rowStatus('satellite','none selected');if($('satellitePassResults'))$('satellitePassResults').textContent='No satellites selected';return;}
+    if(!ids.length){satelliteCatalog=[];satelliteLayer.clearLayers();updateNextSatelliteCard([]);rowStatus('satellite','none selected');if($('satellitePassResults'))$('satellitePassResults').textContent='No satellites selected';return;}
     try{
       const data=await getJson('/api/live/satellites?ids='+encodeURIComponent(ids.join(',')));
       if(sequence!==satelliteLoadSequence)return;
@@ -436,6 +460,7 @@
     oldLoadLocal();
     try { const p=JSON.parse(localStorage.getItem('hammap')||'{}'); if(Number.isFinite(p.latitude))$('latitude').value=p.latitude;if(Number.isFinite(p.longitude))$('longitude').value=p.longitude; } catch {}
     updateStation(); updateActivationState();
+    if(satelliteCatalog.length)renderSatellites();
   };
   applyStation = updateStation;
   $('homeMap').onclick = () => radioMap.setView([station.lat,station.lon],8,{animate:true});
