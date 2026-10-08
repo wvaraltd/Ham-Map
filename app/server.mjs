@@ -155,6 +155,24 @@ async function handler(req, res) {
       const recent=Array.isArray(cycle)?cycle.at(-1):{};
       return json(res,200,{kp:latestNumeric(kp,'Kp'),solarFlux:Number(recent?.['f10.7']),sunspots:Number(recent?.ssn),bz:mag?latestNumeric(mag,'BZ'):null});
     }
+    if (url.pathname === '/api/live/satellite/catalog' && req.method === 'GET') {
+      const groups=['amateur','stations','cubesat'];
+      const results=await Promise.allSettled(groups.map(group=>remoteJson('https://celestrak.org/NORAD/elements/gp.php?GROUP='+group+'&FORMAT=JSON',3600000)));
+      const entries=new Map();
+      for(let i=0;i<results.length;i++){
+        const result=results[i];if(result.status!=='fulfilled'||!Array.isArray(result.value))continue;
+        for(const item of result.value){
+          const norad=Number(item.NORAD_CAT_ID);
+          if(!Number.isSafeInteger(norad)||norad<1||norad>999999||!item.EPOCH)continue;
+          const category=groups[i];
+          const existing=entries.get(norad);
+          if(!existing)entries.set(norad,{norad,name:String(item.OBJECT_NAME||'NORAD '+norad).slice(0,100),categories:[category]});
+          else if(!existing.categories.includes(category))existing.categories.push(category);
+        }
+      }
+      if(!entries.size)return json(res,502,{error:'CelesTrak satellite catalog unavailable'});
+      return json(res,200,{source:'CelesTrak',satellites:[...entries.values()].sort((a,b)=>a.name.localeCompare(b.name)),groups:groups.filter((_,i)=>results[i].status==='fulfilled'),note:'Catalog group membership does not verify amateur-radio transmitter activity'});
+    }
     if (url.pathname === '/api/live/satellite/lookup' && req.method === 'GET') {
       const raw=String(url.searchParams.get('norad')||'').trim();
       if(!/^[1-9][0-9]{0,5}$/.test(raw))return json(res,400,{error:'Enter a valid NORAD catalog number'});
