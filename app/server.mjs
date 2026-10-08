@@ -111,6 +111,36 @@ async function configuredSource(key) {
   return source;
 }
 
+
+// CSN S.A.T. read-only telemetry bridge. Fixed LAN destination; never proxy arbitrary URLs.
+const csnHost = process.env.CSN_SAT_HOST || '192.168.0.20';
+const csnCache = new Map();
+async function csnRead(kind) {
+  const prior=csnCache.get(kind);
+  if(prior && Date.now()-prior.at<4000)return prior.value;
+  const controller=new AbortController();
+  const timeout=setTimeout(()=>controller.abort(),2500);
+  try {
+    const response=await fetch('http://'+csnHost+'/'+kind,{signal:controller.signal});
+    if(!response.ok)throw new Error('CSN HTTP '+response.status);
+    const raw=await response.json();
+    let value;
+    if(kind==='track') {
+      if(!raw || typeof raw!=='object'||Array.isArray(raw))throw new Error('Invalid CSN tracking response');
+      const fields=['mode','time','az','el','rotEnable','continuous','rigEnabled','satAZ','satEL','satName','satLat','satLon','satFootprint','catno','aosTime','losTime','rng','maxEL','ttaos','ttlos','afreq','freq','dop_up','dop_down'];
+      value=Object.fromEntries(fields.filter(k=>Object.hasOwn(raw,k)).map(k=>[k,raw[k]]));
+      if(Array.isArray(value.freq))value.freq=value.freq.slice(0,24).map(t=>Object.fromEntries(['uid','desct','upFreq','downFreq','upMode','downMode','plu','pld','dop_up','dop_down','off_up','off_down'].filter(k=>Object.hasOwn(t,k)).map(k=>[k,t[k]])));
+    } else {
+      const points=Array.isArray(raw)?raw:raw?.gtrack;
+      if(!Array.isArray(points))throw new Error('Invalid CSN ground track');
+      value={points:points.slice(0,800).filter(p=>Number.isFinite(p.Lat)&&Number.isFinite(p.Lon)).map(p=>({lat:p.Lat*180/Math.PI,lon:p.Lon*180/Math.PI,el:p.El,time:p.time,footprint:p.footprint}))};
+    }
+    const result={connected:true,updatedAt:new Date().toISOString(),...value};
+    csnCache.set(kind,{at:Date.now(),value:result});
+    return result;
+  } finally {clearTimeout(timeout);}
+}
+
 async function handler(req, res) {
   try {
     const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
@@ -122,6 +152,10 @@ async function handler(req, res) {
         const loc=data.location||{};
         return json(res,200,{found:data.status==='VALID',callsign:call,grid:loc.gridsquare||loc.grid||'',latitude:loc.latitude??null,longitude:loc.longitude??null,source:'Callook/FCC'});
       } catch {return json(res,502,{error:'Callsign lookup unavailable'});}
+    }
+    if (req.method === 'GET' && (url.pathname === '/api/csn/track' || url.pathname === '/api/csn/gtrack')) {
+      try {return json(res,200,await csnRead(url.pathname.endsWith('/track')?'track':'gtrack'));}
+      catch {return json(res,503,{connected:false,error:'CSN satellite controller unavailable'});}
     }
     if (url.pathname === '/api/health' && req.method === 'GET') return json(res, 200, { ok: true, service: 'ham-map', database: true });
     if (url.pathname === '/api/live/pota' && req.method === 'GET') {const source=(await feedSources()).pota;if(source?.provider==='disabled')return json(res,503,{error:'POTA source is disabled'});return json(res,200,{spots:await remoteJson('https://api.pota.app/spot/activator',60000)});}
