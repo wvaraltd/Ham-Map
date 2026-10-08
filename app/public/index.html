@@ -69,6 +69,16 @@ body.tv-mode .app{display:block;height:100vh}body.tv-mode .top,body.tv-mode .lef
   body:not(.tv-mode) .brand{flex:0 0 auto;min-width:90px;}
   body:not(.tv-mode) .pillbtn,body:not(.tv-mode) .iconbtn{flex-shrink:0;}
 }
+
+/* Touch tablet navigation: horizontal header swipe and independently accessible panels. */
+@media (min-width:721px) and (max-width:1366px){
+ body:not(.tv-mode) .top{overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:thin;justify-content:flex-start;touch-action:pan-x;}
+ body:not(.tv-mode) .top>*{flex-shrink:0}
+ body:not(.tv-mode) .clocks{margin-left:0}
+ body:not(.tv-mode) .right{display:block;position:absolute;right:0;top:0;bottom:0;width:min(340px,90vw);height:auto;z-index:901;overflow-y:auto;visibility:hidden;transform:translateX(105%);transition:transform .2s ease,visibility .2s;box-shadow:0 8px 30px #0009}
+ body:not(.tv-mode) .right.tablet-open{visibility:visible;transform:translateX(0)}
+ body:not(.tv-mode) #tabletInfoBtn{display:flex}
+}
 </style>
 </head>
 <body>
@@ -84,6 +94,7 @@ body.tv-mode .app{display:block;height:100vh}body.tv-mode .top,body.tv-mode .lef
     <button class="pillbtn mobile-only" id="mobileViewBtn" aria-label="Change mobile view">▦ <span>Map</span></button>
     <button class="pillbtn" id="tvBtn" title="Open map-only display in a new window">▣ <span>TV Map</span></button>
     <button class="pillbtn" id="tvCopyBtn" title="Copy direct map-only display link" aria-label="Copy TV map link">🔗</button>
+    <button class="pillbtn" id="tabletInfoBtn" style="display:none" aria-label="Open information panel" aria-expanded="false">☷ <span>Info</span></button>
     <button class="pillbtn" id="settingsBtn">⚙ <span>Settings</span></button>
   </header>
   <main class="workspace">
@@ -221,6 +232,8 @@ body.tv-mode .app{display:block;height:100vh}body.tv-mode .top,body.tv-mode .lef
     let open;
     if(tabletMapLayout()){
       open=panel.classList.toggle('mobile-open');
+      tabletInfoPanel.classList.remove('tablet-open');
+      tabletInfoBtn.setAttribute('aria-expanded','false');
       document.body.classList.remove('layers-hidden');
     }else{
       open=!document.body.classList.contains('layers-hidden');
@@ -237,6 +250,14 @@ body.tv-mode .app{display:block;height:100vh}body.tv-mode .top,body.tv-mode .lef
   }
   window.addEventListener('orientationchange',()=>setTimeout(()=>radioMap.invalidateSize({pan:false}),400));
   window.addEventListener('pageshow',()=>setTimeout(()=>radioMap.invalidateSize({pan:false}),200));
+  const tabletInfoBtn=document.getElementById('tabletInfoBtn');
+  const tabletInfoPanel=document.querySelector('.workspace > .right');
+  tabletInfoBtn.addEventListener('click',()=>{
+    const open=tabletInfoPanel.classList.toggle('tablet-open');
+    document.getElementById('layersPanel').classList.remove('mobile-open');
+    document.getElementById('layersBtn').setAttribute('aria-expanded','false');
+    tabletInfoBtn.setAttribute('aria-expanded',String(open));
+  });
   document.getElementById('layersBtn').setAttribute('aria-controls','layersPanel');
   document.getElementById('layersBtn').setAttribute('aria-expanded',String(!tabletMapLayout()));
   document.querySelectorAll('.preset').forEach(p=>p.onclick=()=>{document.querySelectorAll('.preset').forEach(x=>x.classList.remove('active'));p.classList.add('active');toast(`${p.textContent} loaded`)});
