@@ -127,7 +127,7 @@ async function csnRead(kind) {
     let value;
     if(kind==='track') {
       if(!raw || typeof raw!=='object'||Array.isArray(raw))throw new Error('Invalid CSN tracking response');
-      const fields=['mode','time','az','el','rotEnable','continuous','rigEnabled','satAZ','satEL','satName','satLat','satLon','satFootprint','catno','aosTime','losTime','rng','maxEL','ttaos','ttlos','afreq','freq','dop_up','dop_down'];
+      const fields=['mode','time','az','el','rotEnable','continuous','rigEnabled','satAZ','satEL','satName','satLat','satLon','satFootprint','catno','aosTime','losTime','rng','maxEL','ttaos','ttlos','afreq','freq','dop_up','dop_down','sdel','satecl','aosAZ','losAZ','gpslock','gpsgr','rigEnabled','lockVFO'];
       value=Object.fromEntries(fields.filter(k=>Object.hasOwn(raw,k)).map(k=>[k,raw[k]]));
       if(Array.isArray(value.freq))value.freq=value.freq.slice(0,24).map(t=>Object.fromEntries(['uid','desct','upFreq','downFreq','upMode','downMode','plu','pld','dop_up','dop_down','off_up','off_down'].filter(k=>Object.hasOwn(t,k)).map(k=>[k,t[k]])));
     } else {
