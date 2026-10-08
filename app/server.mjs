@@ -163,7 +163,7 @@ async function handler(req, res) {
       const [west,south,east,north]=parts;
       if(west < -180 || east > 180 || south < -90 || north > 90 || west >= east || south >= north)return json(res,400,{error:'Invalid bounding box'});
       const isCounty=url.pathname.endsWith('/counties'), layer=isCounty?13:14;
-      const query=new URLSearchParams({where:'1=1',geometry:`${west},${south},${east},${north}`,geometryType:'esriGeometryEnvelope',inSR:'4326',outSR:'4326',spatialRel:'esriSpatialRelIntersects',outFields:'NAME,GEOID,STATE,COUNTY',returnGeometry:'true',maxAllowableOffset:isCounty?'0.002':'0.01',f:'geojson'});
+      const query=new URLSearchParams({where:'1=1',geometry:`${west},${south},${east},${north}`,geometryType:'esriGeometryEnvelope',inSR:'4326',outSR:'4326',spatialRel:'esriSpatialRelIntersects',outFields:'*',returnGeometry:'true',maxAllowableOffset:isCounty?'0.002':'0.01',f:'geojson'});
       const endpoint=`https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/${layer}/query?${query}`;
       return json(res,200,await remoteJson(endpoint,86400000));
     }
