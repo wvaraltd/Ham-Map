@@ -62,13 +62,36 @@
     if (!on && radioMap.hasLayer(layer)) radioMap.removeLayer(layer);
     updateCounters();
   }
-  function drawGrid() {
+  function maidenhead(lat,lon,precision){
+    let x=(lon+180+360)%360,y=Math.max(0,Math.min(179.999999,lat+90)),out='';
+    const chars='ABCDEFGHIJKLMNOPQR',sub='abcdefghijklmnopqrstuvwx';
+    out+=chars[Math.floor(x/20)]+chars[Math.floor(y/10)];x%=20;y%=10;
+    if(precision>=4){out+=Math.floor(x/2)+''+Math.floor(y);x%=2;y%=1;}
+    if(precision>=6)out+=sub[Math.min(23,Math.floor(x*12))]+sub[Math.min(23,Math.floor(y*24))];
+    return out;
+  }
+  function drawGrid(){
     gridMapLayer.clearLayers();
-    for (let lon=-180; lon<=180; lon+=20) gridMapLayer.addLayer(L.polyline([[-90,lon],[90,lon]],{color:'#62a6b7',weight:.6,opacity:.42,interactive:false}));
-    for (let lat=-80; lat<=80; lat+=10) gridMapLayer.addLayer(L.polyline([[lat,-180],[lat,180]],{color:'#62a6b7',weight:.6,opacity:.42,interactive:false}));
+    const zoom=radioMap.getZoom(),stepLon=zoom>=11?1/12:zoom>=6?2:20,stepLat=zoom>=11?1/24:zoom>=6?1:10;
+    const precision=zoom>=11?6:zoom>=6?4:2,bounds=radioMap.getBounds();
+    const west=Math.max(-180,bounds.getWest()),east=Math.min(180,bounds.getEast()),south=Math.max(-90,bounds.getSouth()),north=Math.min(90,bounds.getNorth());
+    const cols=Math.ceil((east-west)/stepLon),rows=Math.ceil((north-south)/stepLat);
+    if(cols*rows>1100){rowStatus('grid','zoom in','warn');return;}
+    const startLon=Math.floor((west+180)/stepLon)*stepLon-180,startLat=Math.floor((south+90)/stepLat)*stepLat-90;
+    for(let x=startLon;x<=east+stepLon;x+=stepLon)gridMapLayer.addLayer(L.polyline([[south,x],[north,x]],{color:'#79d5ed',weight:1,opacity:.72,interactive:false}));
+    for(let y=startLat;y<=north+stepLat;y+=stepLat)gridMapLayer.addLayer(L.polyline([[y,west],[y,east]],{color:'#79d5ed',weight:1,opacity:.72,interactive:false}));
+    let labels=0;
+    for(let x=startLon;x<east;x+=stepLon)for(let y=startLat;y<north;y+=stepLat){
+      const center=[y+stepLat/2,x+stepLon/2];
+      if(!bounds.contains(center)||labels++>=180)continue;
+      const code=maidenhead(center[0],center[1],precision);
+      gridMapLayer.addLayer(L.marker(center,{interactive:false,icon:L.divIcon({className:'hammap-grid-label',html:'<span style="font:600 11px sans-serif;color:#d8f8ff;text-shadow:0 1px 3px #071522">'+code+'</span>',iconSize:[0,0]})}));
+    }
+    rowStatus('grid',precision+'-char grid','ok');
   }
   drawGrid();
-
+  layerButton('grid')?.addEventListener('click',()=>setTimeout(()=>{if(enabled('grid'))drawGrid();},0));
+  radioMap.on('moveend zoomend',()=>{if(enabled('grid'))drawGrid();});
   async function loadBoundaries(kind) {
     const layer = kind === 'states' ? statesLayer : countiesLayer;
     if (kind === 'counties' && radioMap.getZoom() < 5) { rowStatus(kind,'zoom in','warn'); return; }
