@@ -137,6 +137,11 @@ async function handler(req, res) {
       if(!/^[A-Z]{2}$/.test(area))return json(res,400,{error:'Invalid weather area'});
       return json(res,200,await remoteJson(`https://api.weather.gov/alerts/active?area=${area}`,60000));
     }
+    if (url.pathname === '/api/live/aurora' && req.method === 'GET') {
+      const data=await remoteJson('https://services.swpc.noaa.gov/json/ovation_aurora_latest.json',300000);
+      if(!Array.isArray(data.coordinates))throw Object.assign(new Error('NOAA aurora grid unavailable'),{status:502});
+      return json(res,200,{source:'NOAA SWPC OVATION',observation_time:data['Observation Time']||null,forecast_time:data['Forecast Time']||null,coordinates:data.coordinates});
+    }
     if (url.pathname === '/api/live/solar' && req.method === 'GET') {
       if((await feedSources()).solar?.provider==='disabled')return json(res,503,{error:'Solar source is disabled'});
       const [kp,cycle,mag]=await Promise.all([
