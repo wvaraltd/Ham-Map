@@ -157,6 +157,14 @@ async function handler(req, res) {
       try {return json(res,200,await csnRead(url.pathname.endsWith('/track')?'track':'gtrack'));}
       catch {return json(res,503,{connected:false,error:'CSN satellite controller unavailable'});}
     }
+    if (url.pathname === '/api/public/station' && req.method === 'GET') {
+      const { rows } = await pool.query('SELECT s.data FROM settings s ORDER BY s.updated_at DESC LIMIT 1');
+      const d=rows[0]?.data||{};
+      const lat=d.latitude===null||d.latitude===''?NaN:Number(d.latitude);
+      const lon=d.longitude===null||d.longitude===''?NaN:Number(d.longitude);
+      const valid=Number.isFinite(lat)&&Math.abs(lat)<=90&&Number.isFinite(lon)&&Math.abs(lon)<=180&&!(lat===0&&lon===0);
+      return json(res,200,{configured:valid,callsign:String(d.callsign||'').slice(0,16),grid:String(d.grid||'').slice(0,10),location:String(d.location||'').slice(0,80),latitude:valid?lat:null,longitude:valid?lon:null});
+    }
     if (url.pathname === '/api/health' && req.method === 'GET') return json(res, 200, { ok: true, service: 'ham-map', database: true });
     if (url.pathname === '/api/live/pota' && req.method === 'GET') {const source=(await feedSources()).pota;if(source?.provider==='disabled')return json(res,503,{error:'POTA source is disabled'});return json(res,200,{spots:await remoteJson('https://api.pota.app/spot/activator',60000)});}
     if (url.pathname === '/api/live/repeaters' && req.method === 'GET') {
