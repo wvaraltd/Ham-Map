@@ -155,19 +155,28 @@ async function handler(req, res) {
       const recent=Array.isArray(cycle)?cycle.at(-1):{};
       return json(res,200,{kp:latestNumeric(kp,'Kp'),solarFlux:Number(recent?.['f10.7']),sunspots:Number(recent?.ssn),bz:mag?latestNumeric(mag,'BZ'):null});
     }
+    if (url.pathname === '/api/live/satellite/lookup' && req.method === 'GET') {
+      const raw=String(url.searchParams.get('norad')||'').trim();
+      if(!/^[1-9][0-9]{0,5}$/.test(raw))return json(res,400,{error:'Enter a valid NORAD catalog number'});
+      const norad=Number(raw);
+      const data=await remoteJson('https://celestrak.org/NORAD/elements/gp.php?CATNR='+norad+'&FORMAT=JSON',3600000);
+      if(!Array.isArray(data)||!data[0]?.EPOCH)return json(res,404,{error:'No current orbital elements found'});
+      return json(res,200,{name:String(data[0].OBJECT_NAME||'NORAD '+norad).slice(0,100),norad,elements:data[0],source:'CelesTrak'});
+    }
     if (url.pathname === '/api/live/satellites' && req.method === 'GET') {
-      const catalog={ISS:25544,'SO-50':27607,'RS-44':44909};
-      const selected=String(url.searchParams.get('ids')||'ISS,SO-50,RS-44').split(',').map(x=>x.trim().toUpperCase()).filter(x=>Object.hasOwn(catalog,x));
-      const ids=[...new Set(selected)].slice(0,3);
-      if(!ids.length)return json(res,400,{error:'Select at least one supported satellite'});
-      const entries=await Promise.allSettled(ids.map(async name=>{
-        const data=await remoteJson('https://celestrak.org/NORAD/elements/gp.php?CATNR='+catalog[name]+'&FORMAT=JSON',3600000);
+      const raw=String(url.searchParams.get('ids')||'25544,27607,44909');
+      if(raw.length>400)return json(res,400,{error:'Satellite list too long'});
+      const ids=[...new Set(raw.split(',').map(x=>x.trim()))];
+      if(!ids.length||ids.length>20||ids.some(x=>!/^[1-9][0-9]{0,5}$/.test(x)))return json(res,400,{error:'Provide 1–20 valid NORAD catalog numbers'});
+      const entries=await Promise.allSettled(ids.map(async id=>{
+        const norad=Number(id);
+        const data=await remoteJson('https://celestrak.org/NORAD/elements/gp.php?CATNR='+norad+'&FORMAT=JSON',3600000);
         if(!Array.isArray(data)||!data[0]?.EPOCH)throw new Error('Orbital elements unavailable');
-        return {name,norad:catalog[name],elements:data[0]};
+        return {name:String(data[0].OBJECT_NAME||'NORAD '+norad).slice(0,100),norad,elements:data[0]};
       }));
       const satellites=entries.filter(x=>x.status==='fulfilled').map(x=>x.value);
-      if(!satellites.length)return json(res,502,{error:'CelesTrak orbital elements unavailable'});
-      return json(res,200,{source:'CelesTrak GP orbital elements',satellites,unavailable:ids.filter(name=>!satellites.some(x=>x.name===name)),updated:new Date().toISOString()});
+      if(!satellites.length)return json(res,502,{error:'No orbital elements available for selected satellites'});
+      return json(res,200,{source:'CelesTrak GP orbital elements',satellites,unavailable:ids.filter(id=>!satellites.some(x=>x.norad===Number(id))),updated:new Date().toISOString()});
     }
     if (url.pathname === '/api/live/iss' && req.method === 'GET') {
       const source=await configuredSource('iss');let endpoint;
