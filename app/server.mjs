@@ -164,7 +164,7 @@ async function handler(req, res) {
       if(xml.length>5000000)throw Object.assign(new Error('PSK Reporter response too large'),{status:502});
       if(!/<receptionReports\\b/i.test(xml))throw Object.assign(new Error('Invalid PSK Reporter XML'),{status:502});
       const reports=[];
-      for(const match of xml.matchAll(/<receptionReport\\s+([^>]*?)\\/?>/gi)){
+      for(const match of xml.matchAll(new RegExp('<receptionReport\\s+([^>]*?)/?>','gi'))){
         const attributes={};
         for(const attr of match[1].matchAll(/([A-Za-z][A-Za-z0-9]*)="([^"]*)"/g))attributes[attr[1]]=attr[2];
         const freq=Number(attributes.frequency);
