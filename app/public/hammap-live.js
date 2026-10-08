@@ -94,12 +94,31 @@
     const band = bandFor(Number(freq) > 1000 ? Number(freq)/1000 : freq);
     return { lat, lon, call, ref, freq, mode, band, kind };
   }
+  let callsignPoints=[];
+  function updateCallsignLabels(){
+    labelsLayer.clearLayers();
+    if(!enabled('labels'))return;
+    const zoom=radioMap.getZoom(),minGap=zoom>=9?45:zoom>=6?75:110;
+    const seen=[];
+    for(const p of callsignPoints){
+      if(!p.call||!Number.isFinite(p.lat)||!Number.isFinite(p.lon))continue;
+      if(!radioMap.getBounds().contains([p.lat,p.lon]))continue;
+      const xy=radioMap.latLngToContainerPoint([p.lat,p.lon]);
+      if(seen.some(q=>Math.abs(q.x-xy.x)<minGap&&Math.abs(q.y-xy.y)<24))continue;
+      seen.push(xy);
+      labelsLayer.addLayer(L.marker([p.lat,p.lon],{interactive:false,icon:L.divIcon({className:'hammap-call-label',html:'<span style="display:inline-block;white-space:nowrap;background:#091d2ce6;color:#e4f8ff;border:1px solid #3b718a;border-radius:4px;padding:1px 4px;font:600 11px sans-serif">'+safe(p.call)+'</span>',iconSize:[0,0],iconAnchor:[-9,-8]})}));
+      if(seen.length>=180)break;
+    }
+    rowStatus('labels',seen.length+' visible','ok');
+  }
   function renderPortable(layer, spots, kind) {
     layer.clearLayers();
     const normalized=spots.map(x=>normalizeSpot(x,kind)).filter(Boolean).filter(x=>!selectedBand || !x.band || x.band===selectedBand);
     for (const spot of normalized) {
       layer.addLayer(L.marker([spot.lat,spot.lon],{icon:portableIcon(kind)}).bindTooltip(`${safe(spot.call)} • ${kind.toUpperCase()} ${safe(spot.ref)} • ${safe(spot.freq)} ${safe(spot.mode)}`,{className:'ham-tip'}));
     }
+    callsignPoints=callsignPoints.filter(p=>p.kind!==kind).concat(normalized.map(p=>({...p,kind})));
+    updateCallsignLabels();
     return normalized;
   }
   async function loadPortable() {
@@ -156,6 +175,8 @@
       dxLayer.addLayer(L.polyline([tx,rx],{color:'#5bd4ed',weight:1,opacity:.4,interactive:false}));
       dxLayer.addLayer(L.circleMarker(tx,{radius:3,color:'#5bd4ed',fillOpacity:.7}).bindTooltip(label,{className:'ham-tip'}));
     }
+    callsignPoints=callsignPoints.filter(p=>p.kind!=='psk').concat(filtered.flatMap(r=>{const tx=pskGridPoint(r.senderLocator),rx=pskGridPoint(r.receiverLocator);return [[tx,r.senderCallsign],[rx,r.receiverCallsign]].filter(x=>x[0]).map(x=>({lat:x[0][0],lon:x[0][1],call:x[1],kind:'psk'}));}));
+    updateCallsignLabels();
     rowStatus('dx',filtered.length+' reports','ok');
     document.querySelectorAll('.band').forEach(button=>{
       const band=button.querySelector('strong')?.textContent?.trim();
@@ -252,11 +273,14 @@
   };
   $('endActivation').onclick=()=>{const a=JSON.parse(localStorage.getItem('hammap-activation')||'null');if(a){a.active=false;a.ended=new Date().toISOString();localStorage.setItem('hammap-activation',JSON.stringify(a));}updateActivationState();toast('Portable activation ended')};
 
-  for (const name of ['dlayer','aurora','zones','labels']) {
+  for (const name of ['dlayer','aurora','zones']) {
     const button=layerButton(name), row=button?.closest('.toggle-row');
     if(button){button.classList.remove('on');button.disabled=true;button.setAttribute('aria-disabled','true');}
     if(row){row.title='A live data source is not configured';row.style.opacity='.55';rowStatus(name,'not set');}
   }
+  const labelsButton=layerButton('labels');
+  if(labelsButton){labelsButton.disabled=false;labelsButton.removeAttribute('aria-disabled');labelsButton.closest('.toggle-row')?.style.removeProperty('opacity');rowStatus('labels','ready','ok');labelsButton.addEventListener('click',()=>setTimeout(updateCallsignLabels,0));}
+  radioMap.on('moveend zoomend',updateCallsignLabels);
   async function loadRepeaters() {
     try {
       const data=await getJson('/api/live/repeaters');
@@ -297,7 +321,7 @@
   $('allstarNode')?.addEventListener('input',()=>{if($('allstarNode').value.replace(/\D/g,'')&&$('allstarProvider')?.value==='disabled')$('allstarProvider').value='official';updateSourceFields();});
   $('allstarProvider')?.addEventListener('change',()=>{updateSourceFields();});
   loadLocal();
-  for (const name of ['dlayer','aurora','zones','labels']) layerButton(name)?.classList.remove('on');
+  for (const name of ['dlayer','aurora','zones']) layerButton(name)?.classList.remove('on');
   updateSourceFields();
   loadPsk();
   $('callsign')?.addEventListener('change',loadPsk);
