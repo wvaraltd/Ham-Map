@@ -101,7 +101,7 @@
   const radioMap=L.map('leafletMap',{center:[20,0],zoom:2,zoomControl:true,minZoom:2,maxZoom:9,worldCopyJump:true,zoomSnap:.25});
   L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/World_Physical_Map/MapServer/tile/{z}/{y}/{x}',{attribution:'Earth map &copy; Esri & US National Park Service',maxZoom:8,noWrap:false}).addTo(radioMap);
   const icon=(cls)=>L.divIcon({className:'',html:`<div class="${cls}"></div>`,iconSize:[16,16],iconAnchor:[8,8]});
-  const qth=[];
+  const qth=[20,0]; // Neutral map center until station coordinates are configured
   const qthLayer=L.layerGroup().addTo(radioMap);
   const dxLayer=L.layerGroup([
     L.marker([51.1,10.4],{icon:icon('dx-dot')}).bindTooltip('DL1ABC • 20m FT8',{permanent:true,className:'ham-tip'}),
@@ -150,7 +150,7 @@
   const leafletLayers={night:nightLayer,gray:nightLayer,paths:pathLayer,weather:weatherLayer,satellite:satelliteLayer,dx:dxLayer,labels:dxLayer,meshcore:meshcoreLayer,pota:potaLayer,sota:sotaLayer};
   document.getElementById('zoomIn').onclick=()=>radioMap.zoomIn();
   document.getElementById('zoomOut').onclick=()=>radioMap.zoomOut();
-  document.getElementById('homeMap').onclick=()=>radioMap.setView(qth,6,{animate:true});
+  document.getElementById('homeMap').onclick=()=>{const lat=document.getElementById('latitude')?.value,lon=document.getElementById('longitude')?.value;const valid=lat!==''&&lon!==''&&Number.isFinite(Number(lat))&&Number.isFinite(Number(lon))&&Math.abs(Number(lat))<=90&&Math.abs(Number(lon))<=180;radioMap.setView(valid?[Number(lat),Number(lon)]:[20,0],valid?6:2,{animate:true})};
   document.getElementById('worldView').onclick=()=>radioMap.setView([20,0],2,{animate:true});
   document.querySelectorAll('.toggle').forEach(t=>t.onclick=()=>{t.classList.toggle('on');const layer=leafletLayers[t.dataset.layer];if(layer){const same=[...document.querySelectorAll('[data-layer]')].filter(x=>leafletLayers[x.dataset.layer]===layer);const wanted=same.some(x=>x.classList.contains('on'));if(wanted&&!radioMap.hasLayer(layer))layer.addTo(radioMap);if(!wanted&&radioMap.hasLayer(layer))radioMap.removeLayer(layer)}saveLocal()});
   const drawer=document.getElementById('drawer');document.getElementById('settingsBtn').onclick=()=>{drawer.classList.add('open');drawer.setAttribute('aria-hidden','false')};document.getElementById('closeDrawer').onclick=()=>{drawer.classList.remove('open');drawer.setAttribute('aria-hidden','true')};
