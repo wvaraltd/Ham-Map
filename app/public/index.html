@@ -33,6 +33,30 @@ body.tv-mode .tv-help.auto-hide:hover,body.tv-mode .tv-help.auto-hide:focus-with
 @media(max-width:700px){body.tv-mode .tv-overlay{gap:7px;font-size:12px}.tv-overlay .tv-time{font-size:12px}}
 body.tv-mode .app{display:block;height:100vh}body.tv-mode .top,body.tv-mode .left,body.tv-mode .right,body.tv-mode .bands,body.tv-mode .quick-log,body.tv-mode .map-tools,body.tv-mode .legend,body.tv-mode .station-card{display:none!important}body.tv-mode .workspace{display:block;height:100vh}body.tv-mode .map{width:100vw;height:100vh;position:relative}body.tv-mode #leafletMap{width:100%;height:100%}body.tv-mode .earth{display:none!important}body.tv-mode .leaflet-control-zoom{display:none}body.tv-mode{overflow:hidden}body.tv-mode .tv-overlay{display:flex}.tv-overlay{display:none;position:fixed;top:14px;left:18px;z-index:1000;align-items:center;gap:15px;background:#07131dcc;border:1px solid #285267;border-radius:9px;padding:8px 13px;color:#e7f7fa;font-size:13px;pointer-events:none}.tv-overlay strong{color:#6ee5c9}.tv-overlay .tv-time{font-variant-numeric:tabular-nums;color:#b9d7e1}
 @media(min-width:721px){body.layers-hidden .workspace{grid-template-columns:0 minmax(0,1fr) 300px}body.layers-hidden #layersPanel{visibility:hidden;width:0;padding:0;border:0;overflow:hidden}body.layers-hidden .map{min-width:0}}
+
+/* Tablet / iPad: map-first layout, panels are drawers rather than desktop columns. */
+@media (min-width:721px) and (max-width:1366px){
+  body:not(.tv-mode){overflow:hidden}
+  body:not(.tv-mode) .app{height:100dvh;grid-template-rows:58px minmax(0,1fr) 58px}
+  body:not(.tv-mode) .workspace,body:not(.tv-mode).layers-hidden .workspace{display:block;position:relative;min-height:0;min-width:0;overflow:hidden}
+  body:not(.tv-mode) .map{position:absolute;inset:0;width:100%;height:100%;min-width:0}
+  body:not(.tv-mode) .right{display:none}
+  body:not(.tv-mode) #layersPanel{display:block;position:absolute;left:0;top:0;bottom:0;width:min(310px,85vw);height:auto;z-index:900;overflow:auto;visibility:hidden;transform:translateX(-105%);transition:transform .2s ease,visibility .2s;box-shadow:0 8px 30px #0009}
+  body:not(.tv-mode) #layersPanel.mobile-open{visibility:visible;transform:translateX(0)}
+  body:not(.tv-mode) .station-card{display:none}
+  body:not(.tv-mode) .top{gap:8px;padding:0 10px;min-width:0}
+  body:not(.tv-mode) .brand{min-width:125px}
+  body:not(.tv-mode) .bands{min-height:0;overflow:auto}
+}
+@media (max-width:720px){
+  body:not(.tv-mode){overflow:hidden;height:100dvh}
+  body:not(.tv-mode) .app{height:100dvh;min-height:0;grid-template-rows:58px minmax(0,1fr) 0}
+  body:not(.tv-mode) .workspace{height:100%;min-height:0;overflow:hidden}
+  body:not(.tv-mode) .map{height:100%;min-height:0}
+  body:not(.tv-mode) .bands{display:none}
+  body:not(.tv-mode) #layersPanel{height:100%;visibility:hidden}
+  body:not(.tv-mode) #layersPanel.mobile-open{visibility:visible}
+}
 </style>
 </head>
 <body>
@@ -179,15 +203,23 @@ body.tv-mode .app{display:block;height:100vh}body.tv-mode .top,body.tv-mode .lef
   document.getElementById('worldView').onclick=()=>radioMap.setView([20,0],2,{animate:true});
   document.querySelectorAll('.toggle').forEach(t=>t.onclick=()=>{t.classList.toggle('on');const layer=leafletLayers[t.dataset.layer];if(layer){const same=[...document.querySelectorAll('[data-layer]')].filter(x=>leafletLayers[x.dataset.layer]===layer);const wanted=same.some(x=>x.classList.contains('on'));if(wanted&&!radioMap.hasLayer(layer))layer.addTo(radioMap);if(!wanted&&radioMap.hasLayer(layer))radioMap.removeLayer(layer)}saveLocal()});
   const drawer=document.getElementById('drawer');document.getElementById('settingsBtn').onclick=()=>{drawer.classList.add('open');drawer.setAttribute('aria-hidden','false')};document.getElementById('closeDrawer').onclick=()=>{drawer.classList.remove('open');drawer.setAttribute('aria-hidden','true')};
+  const tabletMapLayout=()=>window.matchMedia('(max-width:1366px)').matches;
   document.getElementById('layersBtn').onclick=()=>{
     const panel=document.getElementById('layersPanel');
-    const open=panel.classList.toggle('mobile-open');
-    document.body.classList.toggle('layers-hidden',!open);
+    let open;
+    if(tabletMapLayout()){
+      open=panel.classList.toggle('mobile-open');
+      document.body.classList.remove('layers-hidden');
+    }else{
+      open=!document.body.classList.contains('layers-hidden');
+      open=!open;
+      document.body.classList.toggle('layers-hidden',!open);
+    }
     document.getElementById('layersBtn').setAttribute('aria-expanded',String(open));
-    setTimeout(()=>radioMap.invalidateSize(),150);
+    setTimeout(()=>radioMap.invalidateSize(),250);
   };
   document.getElementById('layersBtn').setAttribute('aria-controls','layersPanel');
-  document.getElementById('layersBtn').setAttribute('aria-expanded','true');
+  document.getElementById('layersBtn').setAttribute('aria-expanded',String(!tabletMapLayout()));
   document.querySelectorAll('.preset').forEach(p=>p.onclick=()=>{document.querySelectorAll('.preset').forEach(x=>x.classList.remove('active'));p.classList.add('active');toast(`${p.textContent} loaded`)});
   function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),1800)}
   function tick(){const d=new Date();document.getElementById('utc').textContent=d.toISOString().slice(11,19)+' UTC';document.getElementById('local').textContent=d.toLocaleString([], {weekday:'short',hour:'numeric',minute:'2-digit',timeZoneName:'short'})}tick();setInterval(tick,1000);
