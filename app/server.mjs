@@ -147,7 +147,7 @@ async function handler(req, res) {
     if (url.pathname === '/api/live/radar' && req.method === 'GET') {
       const data=await remoteJson('https://api.rainviewer.com/public/weather-maps.json',300000);
       const frame=data?.radar?.past?.at(-1);
-      if(!frame||typeof frame.path!=='string'||!frame.path.startsWith('/v2/radar/')||!Number.isSafeInteger(Number(frame.path.slice(10))))return json(res,502,{error:'Radar frame unavailable'});
+      if(!frame||typeof frame.path!=='string'||!frame.path.startsWith('/v2/radar/')||!/^[a-f0-9]{12}$/.test(frame.path.slice(10)))return json(res,502,{error:'Radar frame unavailable'});
       return json(res,200,{source:'RainViewer',time:frame.time,path:frame.path});
     }
     if (url.pathname === '/api/live/aurora' && req.method === 'GET') {
