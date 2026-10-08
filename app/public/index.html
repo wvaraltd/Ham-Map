@@ -95,6 +95,10 @@ body.tv-mode .app{display:block;height:100vh}body.tv-mode .top,body.tv-mode .lef
 /* Keep quick logging anchored to the actual map, not the browser viewport. */
 #map .quick-log{position:absolute;right:18px;bottom:18px;z-index:1000;}
 @media(max-width:720px){#map .quick-log{display:block;right:12px;bottom:14px}}
+
+.csn-card{position:absolute;right:16px;top:72px;z-index:850;width:min(290px,calc(100% - 32px));background:#071c29ed;border:1px solid #38768c;border-radius:12px;padding:12px;color:#d8f5fa;box-shadow:0 8px 28px #0008;font-size:12px}
+.csn-card[hidden]{display:none}.csn-card .csn-head{display:flex;justify-content:space-between;gap:10px;align-items:center}.csn-card button{cursor:pointer;background:#163848;color:#e1faff;border:1px solid #437388;border-radius:6px;padding:5px 8px}.csn-card .csn-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}.csn-card small{display:block;color:#91b5c2}.csn-card strong{font-size:14px}
+@media(max-width:720px){.csn-card{top:60px;right:10px;width:min(270px,calc(100% - 20px))}}
 </style>
 </head>
 <body>
@@ -110,7 +114,8 @@ body.tv-mode .app{display:block;height:100vh}body.tv-mode .top,body.tv-mode .lef
     <button class="pillbtn mobile-only" id="mobileViewBtn" aria-label="Change mobile view">▦ <span>Map</span></button>
     <button class="pillbtn" id="tvBtn" title="Open map-only display in a new window">▣ <span>TV Map</span></button>
     <button class="pillbtn" id="tvCopyBtn" title="Copy direct map-only display link" aria-label="Copy TV map link">🔗</button>
-    <button class="pillbtn" id="tabletInfoBtn" aria-label="Open information panel" aria-expanded="false">☷ <span>Info</span></button>
+    <button class="pillbtn" id="csnBtn" aria-label="Show CSN satellite tracker">🛰 <span>Tracker</span></button>
+ <button class="pillbtn" id="tabletInfoBtn" aria-label="Open information panel" aria-expanded="false">☷ <span>Info</span></button>
     <button class="pillbtn" id="settingsBtn">⚙ <span>Settings</span></button>
   </header>
   <main class="workspace">
@@ -146,6 +151,7 @@ body.tv-mode .app{display:block;height:100vh}body.tv-mode .top,body.tv-mode .lef
     </aside>
     <section class="map" id="map">
       <div id="leafletMap" class="leaflet-map" aria-label="Interactive world radio conditions map"></div>
+      <div class="csn-card" id="csnCard" hidden><div class="csn-head"><b>🛰 CSN S.A.T. Controller</b><button id="csnClose" aria-label="Close satellite controller panel">×</button></div><div id="csnStatus">Connecting…</div><div class="csn-grid" id="csnDetails"></div><label style="display:block;margin-top:9px"><input type="checkbox" id="csnGroundTrack" checked> Show controller ground track</label></div>
       <button class="quick-log" id="quickLogBtn">＋ LOG QSO</button>
       <svg class="earth" viewBox="0 0 1000 600" role="img" aria-label="Interactive world radio conditions map">
         <g id="gridLayer"></g>
@@ -301,6 +307,7 @@ body.tv-mode .app{display:block;height:100vh}body.tv-mode .top,body.tv-mode .lef
   if(document.modelContext?.registerTool){document.modelContext.registerTool({name:'configure_station',title:'Configure Ham Map station',description:'Update the visible station callsign, Maidenhead grid, location, and weather state.',inputSchema:{type:'object',properties:{callsign:{type:'string'},grid:{type:'string'},location:{type:'string'},weatherArea:{type:'string',enum:['WV','VA','NC','SC','TN']}},required:['callsign','grid','location'],additionalProperties:false},annotations:{readOnlyHint:false,untrustedContentHint:false},execute:async i=>{if(!/^[A-Z0-9/]{3,12}$/i.test(i.callsign)||!/[A-R]{2}[0-9]{2}/i.test(i.grid))throw new Error('Invalid callsign or Maidenhead grid');callsign.value=i.callsign;grid.value=i.grid;location.value=i.location;if(i.weatherArea)weatherArea.value=i.weatherArea;saveLocal();applyStation();await loadNws();return{saved:true,callsign:callsign.value,grid:grid.value,location:location.value}}})}
 </script>
 <script src="hammap-client.js?v=0.3.2"></script>
+<script src="hammap-csn.js?v=1"></script>
 <script src="https://cdn.jsdelivr.net/npm/satellite.js@6.0.1/dist/satellite.min.js"></script><script src="hammap-live.js?v=0.3.8"></script><script src="hammap-tv.js?v=3"></script>
 <script>
 (() => {
