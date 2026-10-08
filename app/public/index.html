@@ -306,7 +306,7 @@ body.tv-mode .app{display:block;height:100vh}body.tv-mode .top,body.tv-mode .lef
   weatherArea.onchange=loadNws;loadLocal();loadNws();
   if(document.modelContext?.registerTool){document.modelContext.registerTool({name:'configure_station',title:'Configure Ham Map station',description:'Update the visible station callsign, Maidenhead grid, location, and weather state.',inputSchema:{type:'object',properties:{callsign:{type:'string'},grid:{type:'string'},location:{type:'string'},weatherArea:{type:'string',enum:['WV','VA','NC','SC','TN']}},required:['callsign','grid','location'],additionalProperties:false},annotations:{readOnlyHint:false,untrustedContentHint:false},execute:async i=>{if(!/^[A-Z0-9/]{3,12}$/i.test(i.callsign)||!/[A-R]{2}[0-9]{2}/i.test(i.grid))throw new Error('Invalid callsign or Maidenhead grid');callsign.value=i.callsign;grid.value=i.grid;location.value=i.location;if(i.weatherArea)weatherArea.value=i.weatherArea;saveLocal();applyStation();await loadNws();return{saved:true,callsign:callsign.value,grid:grid.value,location:location.value}}})}
 </script>
-<script src="hammap-client.js?v=0.3.2"></script>
+<script src="hammap-client.js?v=0.3.3"></script>
 <script src="hammap-csn.js?v=1"></script>
 <script src="https://cdn.jsdelivr.net/npm/satellite.js@6.0.1/dist/satellite.min.js"></script><script src="hammap-live.js?v=0.3.8"></script><script src="hammap-tv.js?v=3"></script>
 <script>
