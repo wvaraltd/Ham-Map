@@ -111,6 +111,15 @@ async function configuredSource(key) {
 async function handler(req, res) {
   try {
     const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+    if (url.pathname === '/api/callsign/lookup' && req.method === 'GET') {
+      const call=String(url.searchParams.get('call')||'').trim().toUpperCase();
+      if(!/^[A-Z0-9]{3,10}$/.test(call))return json(res,400,{error:'Invalid callsign'});
+      try {
+        const data=await remoteJson('https://callook.info/'+encodeURIComponent(call)+'/json',3600000);
+        const loc=data.location||{};
+        return json(res,200,{found:data.status==='VALID',callsign:call,grid:loc.gridsquare||loc.grid||'',latitude:loc.latitude??null,longitude:loc.longitude??null,source:'Callook/FCC'});
+      } catch {return json(res,502,{error:'Callsign lookup unavailable'});}
+    }
     if (url.pathname === '/api/health' && req.method === 'GET') return json(res, 200, { ok: true, service: 'ham-map', database: true });
     if (url.pathname === '/api/live/pota' && req.method === 'GET') {const source=(await feedSources()).pota;if(source?.provider==='disabled')return json(res,503,{error:'POTA source is disabled'});return json(res,200,{spots:await remoteJson('https://api.pota.app/spot/activator',60000)});}
     if (url.pathname === '/api/live/sota' && req.method === 'GET') {
