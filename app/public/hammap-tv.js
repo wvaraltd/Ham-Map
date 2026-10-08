@@ -49,7 +49,16 @@ if(rotating)setTimeout(applyProfile,2000);
 setTimeout(()=>controls.classList.add('auto-hide'),12000);
 document.addEventListener('fullscreenchange',()=>{fullscreen.textContent=document.fullscreenElement?'⛶ Exit fullscreen':'⛶ Fullscreen';setTimeout(()=>radioMap.invalidateSize(),100);});
 
-setInterval(()=>{time.textContent=new Date().toLocaleTimeString('en-GB',{timeZone:'UTC',hour12:false})+' UTC';},1000);
+const worldTime=document.createElement('span');worldTime.className='tv-time';worldTime.title='World clocks: London, New York and Tokyo';
+overlay.append(worldTime);
+const moon=document.createElement('span');moon.className='tv-time';moon.title='Approximate lunar phase (not a precise moon-position ephemeris)';overlay.append(moon);
+const fmt=(zone)=>new Intl.DateTimeFormat('en-GB',{timeZone:zone,hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date());
+const updateClock=()=>{
+time.textContent=new Date().toLocaleTimeString('en-GB',{timeZone:'UTC',hour12:false})+' UTC';
+worldTime.textContent='NY '+fmt('America/New_York')+' · LON '+fmt('Europe/London')+' · TOK '+fmt('Asia/Tokyo');
+const age=((Date.now()-Date.UTC(2000,0,6,18,14))/86400000%29.530588853+29.530588853)%29.530588853;
+const fraction=age/29.530588853;const symbols=['🌑','🌒','🌓','🌔','🌕','🌖','🌗','🌘'];moon.textContent=symbols[Math.floor((fraction+1/16)*8)%8]+' Moon';
+};updateClock();setInterval(updateClock,1000);
 const sync=message=>{
 if(rotating||!message||!Array.isArray(message.layers)||!Array.isArray(message.center))return;
 for(const b of document.querySelectorAll('#layersPanel [data-layer]')){
