@@ -57,6 +57,18 @@ body.tv-mode .app{display:block;height:100vh}body.tv-mode .top,body.tv-mode .lef
   body:not(.tv-mode) #layersPanel{height:100%;visibility:hidden}
   body:not(.tv-mode) #layersPanel.mobile-open{visibility:visible}
 }
+
+/* iPad Safari: keep Leaflet's viewport equal to the available map region. */
+@media (min-width:721px) and (max-width:1366px){
+  body:not(.tv-mode) .workspace{width:100%;height:100%;}
+  body:not(.tv-mode) #map{right:0;bottom:0;overflow:hidden;background:#075b9a;}
+  body:not(.tv-mode) #leafletMap{position:absolute;inset:0;width:100%!important;height:100%!important;}
+  body:not(.tv-mode) .top{overflow:hidden;flex-wrap:nowrap;}
+  body:not(.tv-mode) .clocks{flex:0 0 auto;white-space:nowrap;min-width:0;}
+  body:not(.tv-mode) .clocks .local{white-space:nowrap;}
+  body:not(.tv-mode) .brand{flex:0 0 auto;min-width:90px;}
+  body:not(.tv-mode) .pillbtn,body:not(.tv-mode) .iconbtn{flex-shrink:0;}
+}
 </style>
 </head>
 <body>
@@ -218,6 +230,13 @@ body.tv-mode .app{display:block;height:100vh}body.tv-mode .top,body.tv-mode .lef
     document.getElementById('layersBtn').setAttribute('aria-expanded',String(open));
     setTimeout(()=>radioMap.invalidateSize(),250);
   };
+  // Safari may finish viewport/toolbar sizing after Leaflet initializes.
+  if (typeof ResizeObserver !== 'undefined') {
+    const mapResizeObserver=new ResizeObserver(()=>radioMap.invalidateSize({pan:false}));
+    mapResizeObserver.observe(document.getElementById('map'));
+  }
+  window.addEventListener('orientationchange',()=>setTimeout(()=>radioMap.invalidateSize({pan:false}),400));
+  window.addEventListener('pageshow',()=>setTimeout(()=>radioMap.invalidateSize({pan:false}),200));
   document.getElementById('layersBtn').setAttribute('aria-controls','layersPanel');
   document.getElementById('layersBtn').setAttribute('aria-expanded',String(!tabletMapLayout()));
   document.querySelectorAll('.preset').forEach(p=>p.onclick=()=>{document.querySelectorAll('.preset').forEach(x=>x.classList.remove('active'));p.classList.add('active');toast(`${p.textContent} loaded`)});
